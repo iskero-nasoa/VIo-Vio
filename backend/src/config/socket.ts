@@ -14,7 +14,7 @@ interface SocketWithUser extends Socket {
 export const initSocket = (server: HttpServer) => {
   io = new Server(server, {
     cors: {
-      origin: "http://localhost:3002",
+      origin: env.CORS_ORIGIN,
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
       credentials: true,
     },
