@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Light Theme Variables */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --bg-tertiary: #F1F5F9;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-tertiary: #94A3B8;
+  --border-color: #E2E8F0;
+  --primary-color: #007AFF;
+  --accent-color: #34C759;
+  --success: #10B981;
+  --error: #EF4444;
+  --warning: #F59E0B;
+  
+  --primary-rgb: 0, 122, 255;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+.dark {
+  /* Dark Theme Variables */
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --bg-tertiary: #334155;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-tertiary: #64748B;
+  --border-color: #1E293B;
+  --primary-color: #38BDF8;
+  --accent-color: #2DD4BF;
+  --success: #34D399;
+  --error: #FB7185;
+  --warning: #FBBF24;
+  
+  --primary-rgb: 56, 189, 248;
+}
+
+@layer base {
+  * {
+    @apply border-slate-200 dark:border-slate-800 transition-colors duration-200;
+  }
+  
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    @apply antialiased overflow-hidden;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background-color: rgba(var(--bg-primary), 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(var(--border-color), 0.1);
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 10px;
+  }
+}

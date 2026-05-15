@@ -1,0 +1,21 @@
+/* src/styles/tablet.css */
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .sidebar-collapsed {
+    width: 80px !important;
+  }
+  
+  .sidebar-collapsed span {
+    display: none;
+  }
+  
+  .sidebar-collapsed .px-4 {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .container-tablet-fluid {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

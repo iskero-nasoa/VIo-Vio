@@ -1,0 +1,44 @@
+/* src/styles/auth.css */
+
+.auth-card {
+  @apply bg-white dark:bg-slate-900/50 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl border border-white/20 dark:border-slate-800 p-8 md:p-12;
+}
+
+.auth-title {
+  @apply text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight;
+}
+
+.auth-subtitle {
+  @apply text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mt-2 mb-8;
+}
+
+.auth-input-group {
+  @apply space-y-6 mb-8;
+}
+
+.auth-footer {
+  @apply mt-8 text-center border-t border-slate-100 dark:border-slate-800 pt-8;
+}
+
+.auth-link {
+  @apply text-primary font-black uppercase tracking-widest text-[10px] hover:underline transition-all;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.9) opacity(0); }
+  100% { transform: scale(1) opacity(1); }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}

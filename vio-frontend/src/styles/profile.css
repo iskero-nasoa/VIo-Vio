@@ -1,0 +1,36 @@
+/* src/styles/profile.css */
+
+/* Fade-in animations for tab switching */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Custom scrollbar for settings tab */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5); /* text-slate-400 */
+  border-radius: 10px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.8); /* text-slate-500 */
+}
+
+/* Specific styling for the toggle switches */
+/* Using Tailwind utility classes for toggles in SettingsTab.js, 
+   but we can add a subtle shadow here if desired */
+.toggle-switch {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
