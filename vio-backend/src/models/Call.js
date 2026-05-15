@@ -54,7 +54,7 @@ const callSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: {
-        values: ['ringing', 'active', 'ended', 'missed', 'rejected'],
+        values: ['ringing', 'active', 'ended', 'missed'],
         message: '{VALUE} is not a valid call status',
       },
       default: 'ringing',

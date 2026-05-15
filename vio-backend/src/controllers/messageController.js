@@ -42,12 +42,26 @@ exports.sendMessage = async (req, res) => {
     }
 
     // ── Build message data ────────────────────────────
+    let finalMessageType = messageType || 'text';
+    const attachmentsArray = Array.isArray(attachments) ? attachments : [];
+
+    if (attachmentsArray.length > 0) {
+      const types = attachmentsArray.map(a => a.type);
+      if (types.every(t => t === 'image' || t === 'video')) {
+        finalMessageType = 'media';
+      } else if (types.some(t => t === 'audio')) {
+        finalMessageType = 'audio';
+      } else {
+        finalMessageType = 'file';
+      }
+    }
+
     const messageData = {
       chatId,
       senderId,
       content: content || '',
-      messageType: messageType || 'text',
-      attachments: Array.isArray(attachments) ? attachments : [],
+      messageType: finalMessageType,
+      attachments: attachmentsArray,
       replyTo: replyTo || null,
     };
 

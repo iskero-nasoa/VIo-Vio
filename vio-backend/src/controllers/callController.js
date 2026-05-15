@@ -136,8 +136,9 @@ exports.rejectCall = async (req, res) => {
     const call = await Call.findById(callId);
     if (!call) return res.status(404).json({ error: 'Call not found' });
 
-    call.status = 'rejected';
+    call.status = 'ended';
     call.endTime = new Date();
+    call.endReason = 'rejected';
     await call.save();
 
     emitToUser(call.initiatorId.toString(), WS_EVENTS.CALL_REJECTED, { callId, rejectedBy: userId });

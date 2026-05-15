@@ -64,7 +64,7 @@ const getUserStatus = (userId) => {
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:3000',
+      origin: process.env.CLIENT_URL || ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -110,8 +110,9 @@ const initSocket = (server) => {
     // ────────────────────────────────────────────────
 
     // ── join-chat ────────────────────────────────────
-    socket.on(WS_EVENTS.JOIN_CHAT, async (chatId) => {
+    socket.on(WS_EVENTS.JOIN_CHAT, async (data) => {
       try {
+        const chatId = typeof data === 'object' ? data.chatId : data;
         if (!chatId) return;
 
         const chat = await Chat.findById(chatId);
@@ -133,7 +134,8 @@ const initSocket = (server) => {
     });
 
     // ── leave-chat ───────────────────────────────────
-    socket.on(WS_EVENTS.LEAVE_CHAT, (chatId) => {
+    socket.on(WS_EVENTS.LEAVE_CHAT, (data) => {
+      const chatId = typeof data === 'object' ? data.chatId : data;
       if (!chatId) return;
       socket.leave(chatId.toString());
       console.log(`🚪 [WS] userId=${userId} left chat=${chatId}`);
@@ -169,8 +171,10 @@ const initSocket = (server) => {
     });
 
     // ── typing ───────────────────────────────────────
-    socket.on(WS_EVENTS.TYPING_START, ({ chatId, username }) => {
+    socket.on(WS_EVENTS.TYPING_START, (data) => {
+      const { chatId, username } = typeof data === 'object' ? data : { chatId: data };
       if (!chatId) return;
+      console.log(`✍️ [WS] userId=${userId} (${username}) started typing in chat=${chatId}`);
       socket.to(chatId.toString()).emit(WS_EVENTS.USER_TYPING, {
         userId,
         username: username || 'Someone',
@@ -178,8 +182,10 @@ const initSocket = (server) => {
       });
     });
 
-    socket.on(WS_EVENTS.TYPING_STOP, ({ chatId }) => {
+    socket.on(WS_EVENTS.TYPING_STOP, (data) => {
+      const chatId = typeof data === 'object' ? data.chatId : data;
       if (!chatId) return;
+      console.log(`🛑 [WS] userId=${userId} stopped typing in chat=${chatId}`);
       socket.to(chatId.toString()).emit(WS_EVENTS.USER_STOPPED_TYPING, {
         userId,
         chatId: chatId.toString(),
@@ -508,6 +514,18 @@ const initSocket = (server) => {
     // ────────────────────────────────────────────────
     // DISCONNECT
     // ────────────────────────────────────────────────
+
+    socket.on('disconnecting', () => {
+      const rooms = Array.from(socket.rooms);
+      rooms.forEach((room) => {
+        if (room !== socket.id && room !== userId) {
+          socket.to(room).emit(WS_EVENTS.USER_LEFT, {
+            userId,
+            chatId: room,
+          });
+        }
+      });
+    });
 
     socket.on(WS_EVENTS.DISCONNECT, async () => {
       console.log(`👋 [WS] Disconnected: userId=${userId}  socketId=${socket.id}`);

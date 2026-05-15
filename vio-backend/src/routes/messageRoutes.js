@@ -23,8 +23,6 @@ router.delete('/:messageId', messageController.deleteMessage);
 // POST /api/messages/:messageId/react — React to a message
 router.post('/:messageId/react', messageController.reactToMessage);
 
-// POST /api/messages/attachment/upload — Upload a file attachment
-router.post('/attachment/upload', upload.single('message_attachment'), messageController.sendAttachment);
 
 // GET /api/messages/:chatId/topic/:topicId — Messages by topic in supergroup
 router.get('/:chatId/topic/:topicId', messageController.getMessagesByTopic);

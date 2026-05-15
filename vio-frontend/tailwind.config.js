@@ -21,7 +21,8 @@ module.exports = {
         surface: {
           DEFAULT: '#f8fafc', // Slate 50
           dark: '#1e293b',    // Slate 800
-        }
+        },
+        'vio-dark': '#173f35',
       },
     },
   },

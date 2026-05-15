@@ -18,6 +18,7 @@ const chatRoutes = require('../routes/chatRoutes');
 const messageRoutes = require('../routes/messageRoutes');
 const callRoutes = require('../routes/callRoutes');
 const notificationRoutes = require('../routes/notificationRoutes');
+const fileRoutes = require('../routes/fileRoutes');
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/files', fileRoutes);
 
 // Health-check endpoint
 app.get('/api/health', (_req, res) => {

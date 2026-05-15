@@ -55,8 +55,8 @@ exports.createGroup = async (req, res) => {
     const { groupName, description, memberIds } = req.body;
     const currentUserId = req.user.userId || req.user.id;
 
-    if (!groupName || !memberIds || !Array.isArray(memberIds)) {
-      return res.status(400).json({ error: 'Group name and members array are required' });
+    if (!groupName || !memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
+      return res.status(400).json({ error: 'Group name and at least one member are required' });
     }
 
     // Ensure creator is in the members list
