@@ -64,7 +64,7 @@ const getUserStatus = (userId) => {
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+      origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
       methods: ['GET', 'POST'],
       credentials: true,
     },

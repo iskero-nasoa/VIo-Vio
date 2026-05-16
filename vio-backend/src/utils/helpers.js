@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * Generates a JWT token
@@ -91,8 +93,6 @@ const formatUser = (user) => {
   };
 };
 
-const { v4: uuidv4 } = require('uuid');
-const path = require('path');
 
 /**
  * Creates a unique filename with UUID and original extension
@@ -151,10 +151,10 @@ const formatMessageResponse = (message) => {
       chatId: message.chatId,
       sender: message.senderId
         ? {
-            userId: message.senderId._id,
-            username: message.senderId.username,
-            avatar: message.senderId.avatar,
-          }
+          userId: message.senderId._id,
+          username: message.senderId.username,
+          avatar: message.senderId.avatar,
+        }
         : null,
       content: message.content,
       messageType: message.messageType,
