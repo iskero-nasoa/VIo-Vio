@@ -12,6 +12,7 @@ export interface IMessage extends Document {
     size: number;
   }>;
   replyTo?: mongoose.Types.ObjectId;
+  topicId?: mongoose.Types.ObjectId;
   status: "sent" | "delivered" | "read";
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +21,7 @@ export interface IMessage extends Document {
 const messageSchema = new Schema<IMessage>(
   {
     chatId: { type: Schema.Types.ObjectId, ref: "Chat", required: true },
+    topicId: { type: Schema.Types.ObjectId, ref: "Topic" },
     senderId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     text: { type: String, trim: true, default: "" },
     attachments: [

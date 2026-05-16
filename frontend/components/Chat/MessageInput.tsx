@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, KeyboardEvent, useRef, useEffect } from "react";
-import { SendHorizontal, Paperclip, Smile, X, FileVideo, Loader2 } from "lucide-react";
+import { SendHorizontal, Paperclip, Smile, X, FileVideo, Loader2, Mic } from "lucide-react";
 import { api } from "../../utils/api";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { useTheme } from "next-themes";
 import { Message } from "../../types/chat";
 import { Reply, CornerDownLeft } from "lucide-react";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 interface MessageInputProps {
   onSendMessage: (text: string, attachments?: any[], replyToId?: string) => void;
@@ -29,6 +30,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const { theme } = useTheme();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -111,6 +113,29 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleVoiceSend = async (blob: Blob) => {
+    setIsRecording(false);
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Create a file from the blob
+      const file = new File([blob], "voice-message.webm", { type: "audio/webm" });
+      const uploadRes = await api.uploadFile(file, (progressEvent: any) => {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        setUploadProgress(percent);
+      });
+
+      onSendMessage("", [{ ...uploadRes, type: "audio" }], replyTo?._id);
+      if (onCancelReply) onCancelReply();
+    } catch (error) {
+      console.error("Voice upload failed:", error);
+      alert("Failed to send voice message.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -204,31 +229,50 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           )}
         </div>
 
-        <input 
-          type="text"
-          value={text}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Type message..."
-          className="flex-1 px-4 py-2 bg-secondary text-foreground rounded-lg border border-border focus:border-primary outline-none text-sm placeholder-muted-foreground transition-all"
-        />
-        
-        <button 
-          onClick={handleSend}
-          disabled={(!text.trim() && !selectedFile) || disabled || isUploading}
-          className="p-2 text-primary hover:text-primary/80 transition-all disabled:opacity-30 active:scale-95"
-        >
-          {isUploading ? (
-            <div className="relative">
-              <Loader2 size={24} className="animate-spin" />
-              <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold">
-                {uploadProgress}
-              </span>
-            </div>
-          ) : (
-            <SendHorizontal size={24} />
-          )}
-        </button>
+        {isRecording ? (
+          <VoiceRecorder 
+            onSend={handleVoiceSend}
+            onCancel={() => setIsRecording(false)}
+          />
+        ) : (
+          <>
+            <input 
+              type="text"
+              value={text}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Type message..."
+              className="flex-1 px-4 py-2 bg-secondary text-foreground rounded-lg border border-border focus:border-primary outline-none text-sm placeholder-muted-foreground transition-all"
+            />
+            
+            {text.trim() || selectedFile ? (
+              <button 
+                onClick={handleSend}
+                disabled={disabled || isUploading}
+                className="p-2 text-primary hover:text-primary/80 transition-all disabled:opacity-30 active:scale-95"
+              >
+                {isUploading ? (
+                  <div className="relative">
+                    <Loader2 size={24} className="animate-spin" />
+                    <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold">
+                      {uploadProgress}
+                    </span>
+                  </div>
+                ) : (
+                  <SendHorizontal size={24} />
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsRecording(true)}
+                className="p-2 text-muted-foreground hover:text-primary transition-all active:scale-90"
+              >
+                <Mic size={24} />
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

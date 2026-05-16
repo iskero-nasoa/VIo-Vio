@@ -69,9 +69,18 @@ export const useChat = (chatId: string | null) => {
 
     socket.emit("join_chat", { chatId, userId: user.id });
 
-    const handleMessage = (message: Message) => {
+    const handleMessage = (message: any) => {
       if (message.chatId === chatId) {
         setMessages((prev) => {
+          // If this is a confirmation of an optimistic message, replace it
+          if (message.tempId) {
+            const index = prev.findIndex((m) => m._id === message.tempId);
+            if (index !== -1) {
+              const newMessages = [...prev];
+              newMessages[index] = message;
+              return newMessages;
+            }
+          }
           // Avoid duplicates
           if (prev.some((m) => m._id === message._id)) return prev;
           return [...prev, message];
@@ -114,9 +123,22 @@ export const useChat = (chatId: string | null) => {
       if (!chatId || !socket || !user) return;
       if (!text.trim() && (!attachments || attachments.length === 0)) return;
 
-      // Optimistic message (optional, but let's do it if we want production-ready)
-      // Note: We'll wait for the socket 'message_received' to get the real DB object
-      // But we can emit immediately.
+      // Optimistic message
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage: Message = {
+        _id: tempId,
+        chatId,
+        text,
+        senderId: user.id,
+        senderUsername: user.username,
+        senderAvatar: user.avatar,
+        attachments: attachments || [],
+        status: "sent",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, optimisticMessage]);
       
       try {
         socket.emit("send_message", { 
@@ -124,13 +146,16 @@ export const useChat = (chatId: string | null) => {
           text, 
           senderId: user.id,
           attachments,
-          replyTo: replyToId 
+          replyTo: replyToId,
+          tempId 
         });
         
         // Clear typing status
         socket.emit("typing", { chatId, userId: user.id, isTyping: false });
       } catch (error) {
         console.error("Failed to send message", error);
+        // Remove optimistic message on error
+        setMessages((prev) => prev.filter((m) => m._id !== tempId));
       }
     },
     [chatId, socket, user]

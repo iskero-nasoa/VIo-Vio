@@ -14,6 +14,7 @@ router.post("/", authMiddleware, upload.single("file"), (req: Request, res: Resp
 
     const isImage = req.file.mimetype.startsWith("image/");
     const isVideo = req.file.mimetype.startsWith("video/");
+    const isAudio = req.file.mimetype.startsWith("audio/");
 
     // Check specific size limits
     if (isImage && req.file.size > 5 * 1024 * 1024) {
@@ -21,12 +22,12 @@ router.post("/", authMiddleware, upload.single("file"), (req: Request, res: Resp
       return;
     }
 
-    if (isVideo && req.file.size > 50 * 1024 * 1024) {
-      res.status(400).json({ message: "Video exceeds 50MB limit" });
+    if (isAudio && req.file.size > 10 * 1024 * 1024) {
+      res.status(400).json({ message: "Audio exceeds 10MB limit" });
       return;
     }
 
-    const type = isImage ? "image" : "video";
+    const type = isImage ? "image" : isVideo ? "video" : "audio";
     // We get the path relative to the process.cwd() like uploads/images/file.jpg
     // Let's create a URL that the frontend can fetch
     const normalizedPath = req.file.path.split(path.sep).join("/");

@@ -71,3 +71,32 @@ body {
 .bubble-received {
   @apply bg-secondary text-white rounded-lg px-4 py-2 max-w-xs shadow-sm border border-border/50;
 }
+/* Custom Audio Player */
+.custom-audio-player::-webkit-media-controls-panel {
+  background-color: var(--secondary);
+}
+.custom-audio-player::-webkit-media-controls-play-button,
+.custom-audio-player::-webkit-media-controls-mute-button {
+  background-color: var(--primary);
+  border-radius: 50%;
+}
+
+@keyframes recording-bar {
+  0% { transform: scaleX(0); opacity: 0.5; }
+  50% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(0); opacity: 0.5; }
+}
+
+.animate-recording-bar {
+  animation: recording-bar 2s infinite ease-in-out;
+  transform-origin: left;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

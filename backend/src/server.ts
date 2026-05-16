@@ -8,6 +8,8 @@ import chatRoutes from "./routes/chats";
 import messageRoutes from "./routes/messages";
 import uploadRoutes from "./routes/upload";
 import userRoutes from "./routes/users";
+import groupRoutes from "./routes/groups";
+import supergroupRoutes from "./routes/supergroups";
 import { initSocket } from "./config/socket";
 import path from "path";
 import multer from "multer";
@@ -41,6 +43,8 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/groups", groupRoutes);
+app.use("/api/supergroups", supergroupRoutes);
 
 // 404 handler
 app.use((_req, res) => {

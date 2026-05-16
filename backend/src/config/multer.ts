@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 
 // Ensure upload directories exist
-const uploadDirs = ["uploads/images", "uploads/videos", "uploads/avatars"];
+const uploadDirs = ["uploads/images", "uploads/videos", "uploads/avatars", "uploads/audio"];
 uploadDirs.forEach((dir) => {
   const fullPath = path.join(process.cwd(), dir);
   if (!fs.existsSync(fullPath)) {
@@ -22,6 +22,8 @@ const storage = multer.diskStorage({
       }
     } else if (file.mimetype.startsWith("video/")) {
       dest = "uploads/videos/";
+    } else if (file.mimetype.startsWith("audio/")) {
+      dest = "uploads/audio/";
     }
     cb(null, path.join(process.cwd(), dest));
   },
@@ -39,15 +41,15 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
     } else {
       cb(new Error("Invalid image type. Only JPEG, PNG, GIF, and WEBP are allowed."));
     }
-  } else if (file.mimetype.startsWith("video/")) {
-    const validVideoTypes = ["video/mp4", "video/webm"];
-    if (validVideoTypes.includes(file.mimetype)) {
+    } else if (file.mimetype.startsWith("audio/")) {
+    const validAudioTypes = ["audio/mpeg", "audio/wav", "audio/ogg", "audio/webm", "audio/mp4"];
+    if (validAudioTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid video type. Only MP4 and WEBM are allowed."));
+      cb(new Error("Invalid audio type."));
     }
   } else {
-    cb(new Error("Invalid file type. Only images and videos are allowed."));
+    cb(new Error("Invalid file type. Only images, videos and audio are allowed."));
   }
 };
 

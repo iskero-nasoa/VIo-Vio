@@ -9,8 +9,19 @@ export const setupPresenceSocket = (io: Server, socket: Socket) => {
     const setOnline = async () => {
       await User.findByIdAndUpdate(userId, { status: "online" });
       io.emit("user_status_changed", { userId, status: "online" });
+      // Join personal room automatically
+      socket.join(`user_${userId}`);
     };
     setOnline();
+
+    socket.on("join_user_room", (targetUserId: string) => {
+      socket.join(`user_${targetUserId}`);
+    });
+
+    socket.on("join_supergroup", (supergroupId: string) => {
+      socket.join(`supergroup_${supergroupId}`);
+      console.log(`🔌 Socket ${socket.id} joined supergroup: ${supergroupId}`);
+    });
 
     socket.on("disconnect", async () => {
       // Set user to offline on disconnect
@@ -19,14 +30,14 @@ export const setupPresenceSocket = (io: Server, socket: Socket) => {
     });
 
     socket.on("change_status", async (data: { status: "online" | "away" | "offline"; statusText?: string }) => {
-      await User.findByIdAndUpdate(userId, { 
-        status: data.status, 
-        statusText: data.statusText || "" 
+      await User.findByIdAndUpdate(userId, {
+        status: data.status,
+        statusText: data.statusText || ""
       });
-      io.emit("user_status_changed", { 
-        userId, 
-        status: data.status, 
-        statusText: data.statusText 
+      io.emit("user_status_changed", {
+        userId,
+        status: data.status,
+        statusText: data.statusText
       });
     });
   }

@@ -3,7 +3,10 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useCall } from "@/context/CallContext";
 import { ChatList } from "@/components/Chat/ChatList";
+import { CallNotification } from "@/components/Chat/CallNotification";
+import { CallModal } from "@/components/Chat/CallModal";
 import { LogOut, MessageCircle, User as UserIcon } from "lucide-react";
 import Link from "next/link";
 import { UserAvatar } from "@/components/Common/UserAvatar";
@@ -11,6 +14,17 @@ import { ThemeToggle } from "@/components/Common/ThemeToggle";
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const {
+    callState,
+    incomingCall,
+    localVideoRef,
+    remoteVideoRef,
+    answerCall,
+    rejectCall,
+    endCall,
+    toggleAudio,
+    toggleVideo,
+  } = useCall();
   const router = useRouter();
 
   useEffect(() => {
@@ -31,7 +45,30 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden relative">
+      {/* Call UI */}
+      {incomingCall && (
+        <CallNotification
+          callerId={incomingCall.callerId}
+          callerUsername={incomingCall.callerUsername}
+          callerAvatar={incomingCall.callerAvatar}
+          type={incomingCall.type}
+          onAnswer={answerCall}
+          onReject={rejectCall}
+        />
+      )}
+
+      {callState.status !== "idle" && (
+        <CallModal
+          callState={callState}
+          localVideoRef={localVideoRef}
+          remoteVideoRef={remoteVideoRef}
+          onEndCall={endCall}
+          onToggleAudio={toggleAudio}
+          onToggleVideo={toggleVideo}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className="w-80 bg-card border-r border-border flex flex-col shrink-0">
         {/* Sidebar Header */}
@@ -43,7 +80,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <div className="flex items-center gap-1">
               <ThemeToggle />
-              <button 
+              <button
                 onClick={logout}
                 className="text-muted-foreground hover:text-red-500 p-2 transition-colors"
                 title="Выйти"
@@ -52,7 +89,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               </button>
             </div>
           </div>
-          
+
           <ChatList currentUserId={user.id} />
         </div>
       </aside>

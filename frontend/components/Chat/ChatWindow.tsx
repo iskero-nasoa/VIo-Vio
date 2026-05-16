@@ -5,6 +5,7 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { TypingIndicator } from "./TypingIndicator";
 import { useChat } from "../../hooks/useChat";
+import { useCall } from "../../context/CallContext";
 import { Search, Phone, Video, Info } from "lucide-react";
 import { UserAvatar } from "../Common/UserAvatar";
 import Link from "next/link";
@@ -18,6 +19,7 @@ interface ChatWindowProps {
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, currentUserId, recipient }) => {
   const { messages, loading, sendMessage, emitTyping, typingUsers, deleteMessage } = useChat(chatId);
+  const { initiateCall } = useCall();
   const [replyTo, setReplyTo] = React.useState<Message | null>(null);
 
   return (
@@ -42,10 +44,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, currentUserId, r
           <button className="hover:text-foreground transition-colors p-1">
             <Search size={20} />
           </button>
-          <button className="hover:text-foreground transition-colors p-1">
+          <button 
+            onClick={() => recipient?._id && initiateCall(recipient._id, "audio")}
+            className="hover:text-foreground transition-colors p-1"
+            title="Голосовой звонок"
+          >
             <Phone size={20} />
           </button>
-          <button className="hover:text-foreground transition-colors p-1">
+          <button 
+            onClick={() => recipient?._id && initiateCall(recipient._id, "video")}
+            className="hover:text-foreground transition-colors p-1"
+            title="Видеозвонок"
+          >
             <Video size={20} />
           </button>
           <button className="hover:text-foreground transition-colors p-1">

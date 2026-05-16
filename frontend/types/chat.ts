@@ -40,3 +40,36 @@ export interface Chat {
   updatedAt: string;
   createdAt: string;
 }
+
+export interface Group {
+  _id: string;
+  name: string;
+  avatar?: string;
+  description?: string;
+  members: User[];
+  admin: string | User;
+  messages: Message[];
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface Supergroup {
+  _id: string;
+  name: string;
+  avatar?: string;
+  description?: string;
+  members: User[];
+  admin: string | User;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface Topic {
+  _id: string;
+  supergroupId: string;
+  name: string;
+  description?: string;
+  messages: Message[];
+  updatedAt: string;
+  createdAt: string;
+}

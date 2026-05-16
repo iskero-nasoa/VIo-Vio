@@ -13,6 +13,7 @@ frontend/out/
 backend/dist/
 backend/build/
 backend/node_modules/
+backend/uploads/
 
 # production
 /build

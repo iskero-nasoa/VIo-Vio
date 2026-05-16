@@ -20,7 +20,7 @@ export const setupMessageSocket = (io: Server, socket: SocketWithUser) => {
 
   socket.on(
     "send_message",
-    async (data: { chatId: string; senderId: string; text: string; attachments?: any[]; replyTo?: string }) => {
+    async (data: { chatId: string; senderId: string; text: string; attachments?: any[]; replyTo?: string; tempId?: string }) => {
       try {
         // Save message using controller
         const message = await sendMessage(data.chatId, data.text, data.senderId, data.attachments, data.replyTo);
@@ -32,11 +32,11 @@ export const setupMessageSocket = (io: Server, socket: SocketWithUser) => {
           senderId: message.senderId,
           text: message.text,
           attachments: message.attachments,
-          replyTo: message.replyTo, // Include the populated replyTo data
+          replyTo: message.replyTo,
           createdAt: message.createdAt,
-          // Populated data
           senderUsername: (message.senderId as any).username,
-          senderAvatar: (message.senderId as any).avatar
+          senderAvatar: (message.senderId as any).avatar,
+          tempId: data.tempId // Send back the tempId to the sender
         });
       } catch (error) {
         console.error("Error saving/sending message via socket:", error);

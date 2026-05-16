@@ -3,6 +3,9 @@ import { Server, Socket } from "socket.io";
 import { env } from "./env";
 import { setupMessageSocket } from "../sockets/messageSocket";
 import { setupPresenceSocket } from "../sockets/presenceSocket";
+import { setupGroupSocket } from "../sockets/groupSocket";
+import { setupTopicSocket } from "../sockets/topicSocket";
+import { setupCallSocket } from "../sockets/callSocket";
 import jwt from "jsonwebtoken";
 
 let io: Server;
@@ -42,6 +45,9 @@ export const initSocket = (server: HttpServer) => {
     // Setup handlers
     setupMessageSocket(io, socket);
     setupPresenceSocket(io, socket);
+    setupGroupSocket(io, socket);
+    setupTopicSocket(io, socket);
+    setupCallSocket(io, socket);
 
     socket.on("disconnect", () => {
       console.log(`⚡ Socket disconnected: ${socket.id}`);

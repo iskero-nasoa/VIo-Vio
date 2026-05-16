@@ -69,6 +69,144 @@ export const api = {
     return data;
   },
 
+  getGroups: async () => {
+    const { data } = await apiClient.get("/groups");
+    return data;
+  },
+
+  getGroup: async (groupId: string) => {
+    const { data } = await apiClient.get(`/groups/${groupId}`);
+    return data;
+  },
+
+  createGroup: async (name: string, description?: string, members?: string[]) => {
+    const { data } = await apiClient.post("/groups", { name, description, members });
+    return data;
+  },
+
+  updateGroup: async (groupId: string, payload: any) => {
+    const { data } = await apiClient.patch(`/groups/${groupId}`, payload);
+    return data;
+  },
+
+  deleteGroup: async (groupId: string) => {
+    const { data } = await apiClient.delete(`/groups/${groupId}`);
+    return data;
+  },
+
+  getGroupMessages: async (groupId: string, skip: number = 0, limit: number = 50) => {
+    const { data } = await apiClient.get(`/groups/${groupId}/messages`, {
+      params: { skip, limit }
+    });
+    return data;
+  },
+
+  addGroupMember: async (groupId: string, userId: string) => {
+    const { data } = await apiClient.post(`/groups/${groupId}/members`, { userId });
+    return data;
+  },
+
+  removeGroupMember: async (groupId: string, userId: string) => {
+    const { data } = await apiClient.delete(`/groups/${groupId}/members/${userId}`);
+    return data;
+  },
+
+  leaveGroup: async (groupId: string) => {
+    const { data } = await apiClient.post(`/groups/${groupId}/leave`);
+    return data;
+  },
+
+  // Supergroups
+  getSupergroups: async () => {
+    const { data } = await apiClient.get("/supergroups");
+    return data;
+  },
+
+  getSupergroup: async (id: string) => {
+    const { data } = await apiClient.get(`/supergroups/${id}`);
+    return data;
+  },
+
+  createSupergroup: async (name: string, description?: string, members?: string[]) => {
+    const { data } = await apiClient.post("/supergroups", { name, description, members });
+    return data;
+  },
+
+  updateSupergroup: async (id: string, payload: any) => {
+    const { data } = await apiClient.patch(`/supergroups/${id}`, payload);
+    return data;
+  },
+
+  deleteSupergroup: async (id: string) => {
+    const { data } = await apiClient.delete(`/supergroups/${id}`);
+    return data;
+  },
+
+  joinSupergroup: async (id: string) => {
+    const { data } = await apiClient.post(`/supergroups/${id}/join`);
+    return data;
+  },
+
+  leaveSupergroup: async (id: string) => {
+    const { data } = await apiClient.post(`/supergroups/${id}/leave`);
+    return data;
+  },
+
+  getSupergroupTopics: async (supergroupId: string) => {
+    const { data } = await apiClient.get(`/supergroups/${supergroupId}/topics`);
+    return data;
+  },
+
+  getSupergroupTopicMessages: async (supergroupId: string, topicId: string, skip: number = 0, limit: number = 50) => {
+    const { data } = await apiClient.get(`/supergroups/${supergroupId}/topics/${topicId}/messages`, {
+      params: { skip, limit }
+    });
+    return data;
+  },
+
+  createSupergroupTopic: async (supergroupId: string, name: string, description?: string) => {
+    const { data } = await apiClient.post(`/supergroups/${supergroupId}/topics`, { name, description });
+    return data;
+  },
+
+  updateSupergroupTopic: async (supergroupId: string, topicId: string, payload: any) => {
+    const { data } = await apiClient.patch(`/supergroups/${supergroupId}/topics/${topicId}`, payload);
+    return data;
+  },
+
+  deleteSupergroupTopic: async (supergroupId: string, topicId: string) => {
+    const { data } = await apiClient.delete(`/supergroups/${supergroupId}/topics/${topicId}`);
+    return data;
+  },
+
+  // Topics (aliased for components that use generic names)
+  getTopics: async (supergroupId: string) => {
+    const { data } = await apiClient.get(`/supergroups/${supergroupId}/topics`);
+    return data;
+  },
+
+  getTopicMessages: async (supergroupId: string, topicId: string, skip: number = 0, limit: number = 50) => {
+    const { data } = await apiClient.get(`/supergroups/${supergroupId}/topics/${topicId}/messages`, {
+      params: { skip, limit }
+    });
+    return data;
+  },
+
+  createTopic: async (supergroupId: string, name: string, description?: string) => {
+    const { data } = await apiClient.post(`/supergroups/${supergroupId}/topics`, { name, description });
+    return data;
+  },
+
+  updateTopic: async (supergroupId: string, topicId: string, payload: any) => {
+    const { data } = await apiClient.patch(`/supergroups/${supergroupId}/topics/${topicId}`, payload);
+    return data;
+  },
+
+  deleteTopic: async (supergroupId: string, topicId: string) => {
+    const { data } = await apiClient.delete(`/supergroups/${supergroupId}/topics/${topicId}`);
+    return data;
+  },
+
   createDirectChat: async (targetUserId: string) => {
     const { data } = await apiClient.post("/chats/create-direct", { targetUserId });
     return data;

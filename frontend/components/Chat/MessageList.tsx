@@ -6,6 +6,7 @@ import { Message } from "../../types/chat";
 import { UserAvatar } from "../Common/UserAvatar";
 import { Trash2, MoreVertical, Reply } from "lucide-react";
 import Link from "next/link";
+import { AudioPlayer } from "./AudioPlayer";
 
 interface MessageListProps {
   messages: Message[];
@@ -130,8 +131,10 @@ export const MessageList: React.FC<MessageListProps> = ({
                           <div key={i} className="rounded-lg overflow-hidden border border-black/10">
                             {att.type === "image" ? (
                               <img src={fullUrl} alt={att.filename} className="max-w-full h-auto object-contain" />
-                            ) : (
+                            ) : att.type === "video" ? (
                               <video src={fullUrl} controls className="max-w-full h-auto" />
+                            ) : (
+                              <AudioPlayer src={fullUrl} />
                             )}
                           </div>
                         );
