@@ -20,6 +20,7 @@ router.put('/:chatId', chatController.updateChatInfo);
 router.post('/:chatId/members', chatController.addMembersToChat);
 router.delete('/:chatId/members/:memberId', chatController.removeMemberFromChat);
 router.delete('/:chatId/leave', chatController.leaveChat);
+router.delete('/:chatId/clear', chatController.clearChat);
 
 // ─── Supergroup Topics ────────────────────────────────
 router.post('/:chatId/topics', chatController.addTopic);

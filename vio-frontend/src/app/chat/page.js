@@ -2,10 +2,145 @@
 
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { getSocket } from '../../utils/socket';
 import io from 'socket.io-client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+
+// --- Sub-components for better UI ---
+
+const VoicePlayer = ({ url, isDarkMode, isOwn, senderName, timestamp }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef(null);
+
+  const togglePlay = () => {
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const onTimeUpdate = () => {
+    const current = audioRef.current.currentTime;
+    const total = audioRef.current.duration;
+    setProgress((current / total) * 100);
+  };
+
+  const onLoadedMetadata = () => {
+    setDuration(audioRef.current.duration);
+  };
+
+  const formatTime = (time) => {
+    if (isNaN(time)) return '0:00';
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className={`flex flex-col gap-1 min-w-[240px] p-2 rounded-2xl ${isOwn ? 'text-white' : (isDarkMode ? 'text-white' : 'text-black')}`}>
+      {!isOwn && <span className="text-[11px] font-bold opacity-70 ml-10">{senderName}</span>}
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={togglePlay}
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-sm ${isOwn ? 'bg-white/20 text-white' : 'bg-[#007AFF] text-white'}`}
+        >
+          {isPlaying ? (
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M6 4h4v16H6V4zm8 0h4v16h4V4z"/></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 ml-1"><path d="M8 5v14l11-7z"/></svg>
+          )}
+        </button>
+        
+        <div className="flex-1 flex flex-col gap-1">
+          {/* Simulated Waveform */}
+          <div className="relative h-6 flex items-center gap-[2px]">
+            {[...Array(25)].map((_, i) => (
+              <div 
+                key={i} 
+                className={`flex-1 rounded-full transition-all duration-300 ${progress > (i / 25) * 100 ? (isOwn ? 'bg-white' : 'bg-[#007AFF]') : (isOwn ? 'bg-white/30' : 'bg-gray-300')}`}
+                style={{ height: `${20 + Math.sin(i * 0.5) * 40 + Math.random() * 20}%` }}
+              />
+            ))}
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              value={progress} 
+              onChange={(e) => {
+                const newTime = (e.target.value / 100) * audioRef.current.duration;
+                audioRef.current.currentTime = newTime;
+                setProgress(e.target.value);
+              }}
+              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+            />
+          </div>
+          <div className="flex justify-between items-center text-[10px] font-medium opacity-70">
+            <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
+            <span>{formatTime(duration)}</span>
+          </div>
+        </div>
+        
+        <div className="relative">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isOwn ? 'bg-white/10' : 'bg-gray-100'}`}>
+            <span className="text-lg">🎤</span>
+          </div>
+        </div>
+      </div>
+      <audio 
+        ref={audioRef} 
+        src={url} 
+        onTimeUpdate={onTimeUpdate} 
+        onLoadedMetadata={onLoadedMetadata}
+        onEnded={() => setIsPlaying(false)}
+        className="hidden" 
+      />
+    </div>
+  );
+};
+
+const FileAttachment = ({ att, isDarkMode, isOwn, API_URL }) => {
+  const fullUrl = att.url?.startsWith('/') ? `${API_URL.replace('/api', '')}${att.url}` : att.url;
+  
+  if (att.type === 'image') {
+    return (
+      <div className="relative group overflow-hidden rounded-xl bg-black/5 mb-1">
+        <img src={fullUrl} alt={att.filename} className="max-w-full max-h-[300px] object-cover transition-transform group-hover:scale-105" />
+        <a href={fullUrl} target="_blank" download className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+          <span className="bg-white text-black px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">Download</span>
+        </a>
+      </div>
+    );
+  }
+
+  if (att.type === 'video') {
+    return (
+      <div className="relative rounded-xl overflow-hidden bg-black/5 mb-1 max-w-[300px]">
+        <video controls src={fullUrl} className="w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <a 
+      href={fullUrl} 
+      target="_blank" 
+      className={`flex items-center gap-3 p-3 rounded-xl transition-all mb-1 border ${isOwn ? 'bg-white/10 border-white/10 hover:bg-white/20' : (isDarkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100')}`}
+    >
+      <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center text-xl shadow-sm">
+        {att.type === 'audio' ? '🎵' : att.filename?.endsWith('.pdf') ? '📄' : '📎'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold truncate">{att.filename}</p>
+        <p className="text-[10px] opacity-60 uppercase font-bold">{att.type} • {Math.round(att.size / 1024)} KB</p>
+      </div>
+      <div className="text-xs opacity-50">⬇️</div>
+    </a>
+  );
+};
 
 export default function ChatPage() {
   const [chats, setChats] = useState([]);
@@ -30,6 +165,16 @@ export default function ChatPage() {
   const [showReactionPickerFor, setShowReactionPickerFor] = useState(null);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [typingStatus, setTypingStatus] = useState('');
+  const [deleteDropdown, setDeleteDropdown] = useState(null);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showSupergroupModal, setShowSupergroupModal] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupDesc, setGroupDesc] = useState('');
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [topics, setTopics] = useState([{ name: 'General', description: 'General discussion' }]);
+  const [newTopic, setNewTopic] = useState({ name: '', description: '' });
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -42,13 +187,25 @@ export default function ChatPage() {
       const token = localStorage.getItem('auth_token');
       const savedUser = localStorage.getItem('auth_user');
       if (!token) return window.location.href = '/login';
-      if (savedUser) setUser(JSON.parse(savedUser));
+      
+      if (savedUser) {
+        try {
+          const data = JSON.parse(savedUser);
+          if (data) setUser(data);
+        } catch (e) {
+          console.error('Local storage parse error (auth_user):', e);
+          localStorage.removeItem('auth_user');
+        }
+      }
 
       try {
         const res = await axios.get(`${API_URL}/chats`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const fetchedChats = res.data.data || res.data;
+        console.log('Chats Response:', res);
+        console.log('Chats Type:', typeof res.data);
+        
+        const fetchedChats = (res.data?.data || res.data) || [];
         setChats(fetchedChats);
 
         const counts = {};
@@ -78,55 +235,84 @@ export default function ChatPage() {
     const token = localStorage.getItem('auth_token');
     if (!token) return;
 
-    const socket = io('http://localhost:5000', {
-      auth: { token }
+    const socket = io('http://localhost:5001', {
+      auth: { token },
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5
     });
     socketRef.current = socket;
 
-    // Call Listeners
-    const handleIncomingCall = (data) => setCallState({ status: 'incoming', call: data, duration: 0 });
-    const handleCallAccepted = () => setCallState(prev => prev ? { ...prev, status: 'active' } : null);
-    const handleCallRejected = () => { setCallState(null); alert('Call was rejected'); };
-    const handleCallEnded = () => setCallState(null);
+    socket.on('connect', () => {
+      console.log('✅ Socket CONNECTED:', socket.id);
+    });
 
-    // Message Listener
-    const handleNewMessage = (msg) => {
-      setChats(prev => {
-        const chatExists = prev.find(c => c._id === msg.chatId);
-        if (chatExists) {
-          const updatedChats = prev.map(c => c._id === msg.chatId ? { ...c, lastMessage: msg } : c);
-          return [updatedChats.find(c => c._id === msg.chatId), ...updatedChats.filter(c => c._id !== msg.chatId)];
-        }
-        return prev;
-      });
+    socket.on('disconnect', () => {
+      console.log('❌ Socket DISCONNECTED');
+    });
 
-      if (activeChatRef.current?._id !== msg.chatId) {
-        setUnreadCounts(prev => ({ ...prev, [msg.chatId]: (prev[msg.chatId] || 0) + 1 }));
-      }
+    socket.on('error', (error) => {
+      console.error('Socket ERROR:', error);
+    });
 
+    // Test emit
+    socket.emit('test-event', { hello: 'world' });
+    console.log('Emitted test event');
+
+    socket.on('receive-message', (message) => {
+      console.log('Received message:', message);
       setMessages(prev => {
-        if (prev[msg.chatId]) {
-          if (prev[msg.chatId].find(m => m._id === msg._id)) return prev;
-          return { ...prev, [msg.chatId]: [...prev[msg.chatId], msg] };
-        }
-        return prev;
+        const chatMsgs = prev[message.chatId] || [];
+        // Prevent duplicates
+        if (chatMsgs.find(m => (m._id || m.messageId) === (message._id || message.messageId))) return prev;
+        return {
+          ...prev,
+          [message.chatId]: [...chatMsgs, message]
+        };
       });
-    };
+    });
 
-    // Typing Listener
-    const handleUserTyping = (data) => {
-      if (data.chatId === activeChatRef.current?._id) {
-        setTypingStatus(`${data.username || 'Someone'} is typing...`);
-        setTimeout(() => setTypingStatus(''), 3000);
-      }
-    };
+    socket.on('message-deleted', (data) => {
+      const { messageId, chatId } = typeof data === 'object' ? data : { messageId: data, chatId: activeChatRef.current?._id };
+      setMessages(prev => {
+        const chatMsgs = prev[chatId] || [];
+        return {
+          ...prev,
+          [chatId]: chatMsgs.filter(m => (m._id || m.messageId) !== messageId)
+        };
+      });
+    });
 
-    socket.on('incoming-call', handleIncomingCall);
-    socket.on('call-accepted', handleCallAccepted);
-    socket.on('call-rejected', handleCallRejected);
-    socket.on('call-ended', handleCallEnded);
-    socket.on('receive-message', handleNewMessage);
-    socket.on('user-typing', handleUserTyping);
+    socket.on('reaction-update', (data) => {
+      setMessages(prev => {
+        const chatMsgs = prev[data.chatId];
+        if (!chatMsgs) return prev;
+        const updated = chatMsgs.map(m => (m._id === data.messageId || m.messageId === data.messageId) ? { ...m, reactions: data.reactions } : m);
+        return { ...prev, [data.chatId]: updated };
+      });
+    });
+
+    socket.on('message-removed', (data) => {
+      setMessages(prev => {
+        const chatMsgs = prev[data.chatId];
+        if (!chatMsgs) return prev;
+        return { ...prev, [data.chatId]: chatMsgs.filter(m => m._id !== data.messageId && m.messageId !== data.messageId) };
+      });
+    });
+
+    socket.on('chat-cleared', (data) => {
+      setMessages(prev => ({ ...prev, [data.chatId]: [] }));
+    });
+
+    // Call Listeners
+    socket.on('incoming-call', (data) => setCallState({ status: 'incoming', call: data, duration: 0 }));
+    socket.on('call-accepted', () => setCallState(prev => prev ? { ...prev, status: 'active' } : null));
+    socket.on('call-rejected', () => { setCallState(null); alert('Call was rejected'); });
+    socket.on('call-ended', () => setCallState(null));
+
+    socket.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
 
     return () => {
       socket.disconnect();
@@ -137,7 +323,7 @@ export default function ChatPage() {
   // 4. Active Chat Handling
   useEffect(() => {
     activeChatRef.current = activeChat;
-    if (activeChat && socketRef.current) {
+    if (activeChat?._id && socketRef.current) {
       socketRef.current.emit('join-chat', activeChat._id);
     }
   }, [activeChat]);
@@ -231,9 +417,34 @@ export default function ChatPage() {
       const updated = { ...user, ...profileForm };
       setUser(updated);
       localStorage.setItem('auth_user', JSON.stringify(updated));
+      alert('Profile updated successfully! ✨');
       setShowProfileModal(false);
     } catch (err) {
-      alert('Failed to save profile');
+      alert('Failed to update profile');
+    }
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await axios.post(`${API_URL}/users/avatar`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      const updated = { ...user, avatar: res.data.avatarUrl };
+      setUser(updated);
+      localStorage.setItem('auth_user', JSON.stringify(updated));
+      alert('Avatar updated! ✨');
+    } catch (err) {
+      alert('Avatar upload failed');
     }
   };
 
@@ -256,7 +467,10 @@ export default function ChatPage() {
       const res = await axios.post(`${API_URL}/chats/direct`, { recipientId }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const newChat = res.data.data || res.data;
+      console.log('Create Chat Response:', res);
+      console.log('Create Chat Type:', typeof res.data);
+      const newChat = (res.data?.data || res.data) || null;
+      if (!newChat) return alert('Invalid chat data received');
       setChats(prev => {
         const exists = prev.find(c => c._id === newChat._id);
         return exists ? prev : [newChat, ...prev];
@@ -312,7 +526,8 @@ export default function ChatPage() {
 
   const sendMessage = async (e, directAttachments = null) => {
     if (e) e.preventDefault();
-    if (!messageInput.trim() && !directAttachments && selectedFiles.length === 0) return;
+    const isAttachmentOnly = (directAttachments && directAttachments.length > 0) || selectedFiles.length > 0;
+    if (!messageInput.trim() && !isAttachmentOnly) return;
     if (!activeChat) return;
 
     const chatId = activeChat._id || activeChat.id;
@@ -332,14 +547,17 @@ export default function ChatPage() {
 
           const res = await axios.post(`${API_URL}/files/upload`, formData, {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
-            onUploadProgress: (ev) => setUploadProgress(Math.round(((i + (ev.loaded / ev.total)) / selectedFiles.length) * 100))
+            onUploadProgress: (ev) => {
+              const filePercent = Math.round((ev.loaded * 100) / ev.total);
+              setUploadProgress(Math.round(((i + (ev.loaded / ev.total)) / selectedFiles.length) * 100));
+            }
           });
 
           const uploaded = res.data.data || res.data;
           finalAttachments.push({
             url: uploaded.url,
             filename: uploaded.filename || selectedFiles[i].name,
-            type: uploaded.type || 'file',
+            type: uploaded.type || (selectedFiles[i].type.startsWith('image/') ? 'image' : selectedFiles[i].type.startsWith('video/') ? 'video' : selectedFiles[i].type.startsWith('audio/') ? 'audio' : 'file'),
             size: uploaded.size || selectedFiles[i].size
           });
         }
@@ -355,24 +573,33 @@ export default function ChatPage() {
     try {
       const token = localStorage.getItem('auth_token');
       const body = { chatId, content, messageType: finalAttachments.length > 0 ? 'file' : 'text' };
-      if (finalAttachments.length > 0) body.attachments = finalAttachments;
+      if (finalAttachments.length > 0) {
+        // If there are audio attachments, mark messageType as audio for better sorting/filtering if needed
+        const hasAudio = finalAttachments.some(a => a.type === 'audio');
+        if (hasAudio && !content) body.messageType = 'audio';
+        body.attachments = finalAttachments;
+      }
+      
       const res = await axios.post(`${API_URL}/messages`, body, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const newMsg = res.data.data || res.data;
+      console.log('Send Message Response:', res);
+      console.log('Send Message Type:', typeof res.data);
+      
+      const savedMsg = res.data?.data || res.data;
 
       if (socketRef.current) {
-        socketRef.current.emit('new-message', newMsg);
+        socketRef.current.emit('new-message', savedMsg);
       }
 
       setMessages(prev => {
         const chatMsgs = prev[chatId] ? [...prev[chatId]] : [];
-        if (!chatMsgs.find(m => m._id === newMsg._id)) {
-          chatMsgs.push(newMsg);
+        if (!chatMsgs.find(m => m._id === savedMsg._id)) {
+          chatMsgs.push(savedMsg);
         }
         return { ...prev, [chatId]: chatMsgs };
       });
-      setChats(prev => prev.map(c => c._id === chatId ? { ...c, lastMessage: newMsg } : c));
+      setChats(prev => prev.map(c => c._id === chatId ? { ...c, lastMessage: savedMsg } : c));
       setMessageInput('');
       setIsUploading(false);
       setUploadProgress(0);
@@ -387,17 +614,93 @@ export default function ChatPage() {
     setMessageInput(prev => prev + emoji);
   };
 
-  const handleAddReaction = (messageId, emoji) => {
+  const handleAddReaction = async (messageId, emoji) => {
     if (!activeChat) return;
     const chatId = activeChat._id || activeChat.id;
-    socketRef.current.emit('reaction-added', { messageId, emoji, chatId });
-    setShowReactionPickerFor(null);
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await axios.post(`${API_URL}/messages/${messageId}/react`, { emoji }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log('Reaction Response:', res);
+      console.log('Reaction Type:', typeof res.data);
+
+      const updatedReactions = (res.data?.data || res.data) || [];
+      
+      // Update locally immediately (optimistic)
+      setMessages(prev => {
+        const chatMsgs = prev[chatId];
+        if (!chatMsgs) return prev;
+        const updated = chatMsgs.map(m => (m._id === messageId || m.messageId === messageId) ? { ...m, reactions: updatedReactions } : m);
+        return { ...prev, [chatId]: updated };
+      });
+
+      if (socketRef.current) {
+        socketRef.current.emit('reaction-added', { messageId, emoji, chatId, reactions: res.data });
+      }
+    } catch (err) {
+      console.error('Reaction error', err);
+    } finally {
+      setShowReactionPickerFor(null);
+    }
   };
 
-  const handleDeleteMessage = (messageId) => {
+  const handleDeleteLocally = (messageId) => {
+    if (!activeChat) return;
+    setMessages(prev => ({
+      ...prev,
+      [activeChat._id]: (prev[activeChat._id] || []).filter(m => (m._id || m.messageId) !== messageId)
+    }));
+  };
+
+  const handleDeleteForEveryone = async (messageId) => {
+    if (!activeChat) return;
+    try {
+      const token = localStorage.getItem('auth_token');
+      await axios.delete(`${API_URL}/messages/${messageId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      handleDeleteLocally(messageId);
+      
+      const chatId = activeChat._id || activeChat.id;
+      if (socketRef.current) {
+        socketRef.current.emit('message-deleted', { messageId, chatId });
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Delete failed');
+    }
+  };
+
+  const handleClearChat = async () => {
     if (!activeChat) return;
     const chatId = activeChat._id || activeChat.id;
-    socketRef.current.emit('message-deleted', { messageId, chatId });
+    try {
+      const token = localStorage.getItem('auth_token');
+      await axios.delete(`${API_URL}/chats/${chatId}/clear`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setMessages(prev => ({ 
+        ...prev, 
+        [chatId]: [{
+          _id: 'cleared-' + Date.now(),
+          content: '✨ Chat history cleared',
+          messageType: 'system',
+          createdAt: new Date().toISOString()
+        }] 
+      }));
+      
+      if (socketRef.current) {
+        socketRef.current.emit('chat-cleared', { chatId });
+      }
+      setShowClearConfirm(false);
+      setShowChatMenu(false);
+    } catch (err) {
+      alert('Failed to clear chat');
+    }
   };
 
 
@@ -460,8 +763,12 @@ export default function ChatPage() {
         <div className={`p-6 flex flex-col gap-4 border-b transition-colors ${isDarkMode ? 'border-white/5' : 'border-gray-100'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div onClick={openProfile} className="w-12 h-12 bg-[#007AFF] rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md cursor-pointer hover:ring-2 hover:ring-[#007AFF]/50 transition-all">
-                {user?.username?.[0].toUpperCase()}
+              <div onClick={openProfile} className="w-12 h-12 bg-[#007AFF] rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md cursor-pointer hover:ring-2 hover:ring-[#007AFF]/50 transition-all overflow-hidden">
+                {user?.avatar ? (
+                  <img src={`${API_URL.replace('/api', '')}${user.avatar}`} className="w-full h-full object-cover" alt="Profile" />
+                ) : (
+                  user?.username?.[0].toUpperCase()
+                )}
               </div>
               <div className="flex flex-col cursor-pointer" onClick={openProfile}>
                 <span className="font-bold truncate max-w-[120px]">{user?.username}</span>
@@ -472,9 +779,17 @@ export default function ChatPage() {
               Logout
             </button>
           </div>
-          <button onClick={() => setShowNewChatModal(true)} className="w-full py-3 bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF] hover:text-white rounded-2xl font-bold transition-all text-sm">
-            + New Chat
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowNewChatModal(true)} className="flex-1 py-3 bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF] hover:text-white rounded-2xl font-bold transition-all text-sm">
+              + Chat
+            </button>
+            <button onClick={() => setShowGroupModal(true)} className="flex-1 py-3 bg-[#34C759]/10 text-[#34C759] hover:bg-[#34C759] hover:text-white rounded-2xl font-bold transition-all text-sm">
+              + Group
+            </button>
+            <button onClick={() => setShowSupergroupModal(true)} className="flex-1 py-3 bg-[#5856D6]/10 text-[#5856D6] hover:bg-[#5856D6] hover:text-white rounded-2xl font-bold transition-all text-sm">
+              + Super
+            </button>
+          </div>
         </div>
 
         {/* Chat List */}
@@ -492,7 +807,11 @@ export default function ChatPage() {
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                   <div className="flex justify-between items-center mb-1">
-                    <h4 className="font-bold truncate text-[15px]">{chat.chatName || 'Direct Chat'}</h4>
+                    <h4 className="font-bold truncate text-[15px] flex items-center gap-1.5">
+                      {chat.chatType === 'group' && <span className="text-[10px] bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded-md">👥</span>}
+                      {chat.chatType === 'supergroup' && <span className="text-[10px] bg-purple-500/20 text-purple-500 px-1.5 py-0.5 rounded-md">📋</span>}
+                      {chat.chatName || 'Direct Chat'}
+                    </h4>
                   </div>
                   <p className={`text-sm truncate ${isDarkMode ? 'text-[#CCCCCC]' : 'text-[#999999]'}`}>
                     {chat.lastMessage?.content || 'No messages yet'}
@@ -529,6 +848,30 @@ export default function ChatPage() {
                 <button onClick={toggleTheme} className={`p-3 rounded-2xl transition-all shadow-sm ${isDarkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'}`}>
                   {isDarkMode ? '🌞' : '🌙'}
                 </button>
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowChatMenu(!showChatMenu)} 
+                    className={`p-3 rounded-2xl transition-all shadow-sm ${isDarkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'}`}
+                  >
+                    ⋮
+                  </button>
+                  {showChatMenu && (
+                    <div className={`absolute right-0 mt-2 w-48 rounded-2xl shadow-2xl z-50 border py-2 animate-in fade-in zoom-in duration-200 ${isDarkMode ? 'bg-[#1a4939] border-white/10' : 'bg-white border-gray-100'}`}>
+                      <button 
+                        onClick={() => setShowClearConfirm(true)}
+                        className="w-full px-4 py-3 text-left text-red-500 hover:bg-red-500/10 font-bold transition-all flex items-center gap-2"
+                      >
+                        🗑️ Clear Chat History
+                      </button>
+                      <button 
+                        onClick={() => setShowChatMenu(false)}
+                        className={`w-full px-4 py-3 text-left hover:bg-black/5 transition-all text-sm ${isDarkMode ? 'text-white' : 'text-black'}`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -537,49 +880,112 @@ export default function ChatPage() {
               {Array.isArray(messages[activeChat._id]) && messages[activeChat._id].map((msg, i) => {
                 const isOwn = (msg.senderId?._id || msg.senderId) === (user?.userId || user?.id);
                 return (
-                  <div key={msg._id || i} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-in fade-in duration-300 mb-2`}>
-                    <div className="relative group max-w-[75%] md:max-w-[60%] flex flex-col">
+                  <div key={msg._id || i} className={`flex ${msg.messageType === 'system' ? 'justify-center' : (isOwn ? 'justify-end' : 'justify-start')} animate-in fade-in duration-300 mb-2`}>
+                    {msg.messageType === 'system' ? (
+                      <div className={`px-4 py-1.5 rounded-full text-xs font-bold shadow-sm ${isDarkMode ? 'bg-white/5 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                        {msg.content}
+                      </div>
+                    ) : (
+                      <div className="relative group max-w-[75%] md:max-w-[60%] flex flex-col">
 
                       {/* Message Hover Actions */}
-                      <div className={`absolute top-0 ${isOwn ? '-left-20' : '-right-10'} opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 z-10 px-2 py-1`}>
+                      <div className={`absolute top-0 ${isOwn ? '-left-16' : '-right-10'} opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 z-10 px-2 py-1`}>
                         <button type="button" onClick={() => setShowReactionPickerFor(msg._id || msg.messageId)} className="w-8 h-8 rounded-full flex items-center justify-center text-lg hover:scale-125 transition-transform drop-shadow-md bg-white/90 dark:bg-black/50" title="React">
                           👍
                         </button>
-                        {isOwn && (
-                          <button type="button" onClick={() => handleDeleteMessage(msg._id || msg.messageId)} className="w-8 h-8 rounded-full flex items-center justify-center text-sm hover:scale-125 transition-transform drop-shadow-md bg-white/90 dark:bg-black/50 text-red-500" title="Delete Message">
+                        
+                        <div className="relative">
+                          <button 
+                            type="button" 
+                            onClick={() => setDeleteDropdown(deleteDropdown === (msg._id || msg.messageId) ? null : (msg._id || msg.messageId))} 
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-sm hover:scale-125 transition-transform drop-shadow-md bg-white/90 dark:bg-black/50 text-red-500" 
+                            title="Delete Options"
+                          >
                             🗑️
                           </button>
-                        )}
+
+                          {deleteDropdown === (msg._id || msg.messageId) && (
+                            <div className={`absolute bottom-full ${isOwn ? 'right-0' : 'left-0'} mb-2 w-48 rounded-2xl shadow-2xl border p-1 z-[100] animate-in fade-in zoom-in duration-200 ${isDarkMode ? 'bg-[#1a4939] border-white/10' : 'bg-white border-gray-100'}`}>
+                              <button 
+                                onClick={() => {
+                                  handleDeleteLocally(msg._id || msg.messageId);
+                                  setDeleteDropdown(null);
+                                }}
+                                className={`w-full px-4 py-2.5 text-left text-xs font-bold rounded-xl transition-all ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-50 text-gray-700'}`}
+                              >
+                                {isOwn ? 'Delete for me' : 'Delete for me only'}
+                              </button>
+                              
+                              {isOwn && (
+                                <button 
+                                  onClick={() => {
+                                    handleDeleteForEveryone(msg._id || msg.messageId);
+                                    setDeleteDropdown(null);
+                                  }}
+                                  className={`w-full px-4 py-2.5 text-left text-xs font-bold rounded-xl transition-all text-red-500 ${isDarkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`}
+                                >
+                                  Delete for everyone
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {showReactionPickerFor === (msg._id || msg.messageId) && (
-                        <div className={`absolute -top-10 ${isOwn ? 'right-0' : 'left-0'} flex gap-1 p-2 rounded-2xl shadow-xl z-50 ${isDarkMode ? 'bg-[#1a4939]' : 'bg-white'}`}>
-                          {['👍', '❤️', '😂', '😢', '😡'].map(e => (
-                            <button key={e} type="button" onClick={() => handleAddReaction(msg._id || msg.messageId, e)} className="hover:scale-125 transition-transform text-xl">{e}</button>
+                        <div className={`absolute -top-12 ${isOwn ? 'right-0' : 'left-0'} flex gap-1.5 p-2.5 rounded-full shadow-2xl z-50 animate-in zoom-in duration-200 border ${isDarkMode ? 'bg-[#1a4939] border-white/20' : 'bg-white border-gray-100'}`}>
+                          {['👍', '❤️', '😂', '😢', '😡', '🔥', '✨', '🎉'].map(e => (
+                            <button 
+                              key={e} 
+                              type="button" 
+                              onClick={() => handleAddReaction(msg._id || msg.messageId, e)} 
+                              className="hover:scale-150 transition-transform text-2xl active:scale-95 p-1"
+                              title={e}
+                            >
+                              {e}
+                            </button>
                           ))}
                         </div>
                       )}
 
                       <div className={`px-5 py-3 rounded-2xl text-[15px] shadow-md transition-all ${isOwn ? 'bg-[#007AFF] text-white rounded-tr-sm' : (isDarkMode ? 'bg-white/10 text-white rounded-tl-sm' : 'bg-[#E5E5EA] text-black rounded-tl-sm')}`}>
                         {/* Attachments */}
-                        {msg.attachments?.map((att, idx) => (
-                          <div key={idx} className="mb-2">
-                            {att.type === 'image' && <img src={att.url?.startsWith('/') ? `${API_URL.replace('/api', '')}${att.url}` : att.url} className="rounded-xl max-w-full" />}
-                            {att.type === 'audio' && <audio controls src={att.url?.startsWith('/') ? `${API_URL.replace('/api', '')}${att.url}` : att.url} className="w-full h-10" />}
-                            {att.type === 'file' && <a href={att.url?.startsWith('/') ? `${API_URL.replace('/api', '')}${att.url}` : att.url} target="_blank" className="underline text-sm font-semibold">{att.filename}</a>}
-                            {att.type === 'video' && <video controls src={att.url?.startsWith('/') ? `${API_URL.replace('/api', '')}${att.url}` : att.url} className="rounded-xl max-w-full" />}
-                          </div>
-                        ))}
+                        {msg.attachments?.map((att, idx) => {
+                          if (att.type === 'audio' || att.messageType === 'audio') {
+                            return (
+                              <VoicePlayer 
+                                key={idx} 
+                                url={att.url?.startsWith('/') ? `${API_URL.replace('/api', '')}${att.url}` : att.url} 
+                                isDarkMode={isDarkMode}
+                                isOwn={isOwn}
+                                senderName={msg.senderId?.username || 'User'}
+                                timestamp={msg.createdAt}
+                              />
+                            );
+                          }
+                          return <FileAttachment key={idx} att={att} isDarkMode={isDarkMode} isOwn={isOwn} API_URL={API_URL} />;
+                        })}
+                        
                         {msg.content && <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
 
                         {/* Reactions Display */}
-                        {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {Object.entries(msg.reactions).map(([emoji, users]) => (
-                              <span key={emoji} className={`text-xs px-2 py-1 rounded-full ${isDarkMode ? 'bg-black/30' : 'bg-white/50 text-black'}`}>
-                                {emoji} {users.length}
-                              </span>
-                            ))}
+                        {msg.reactions && msg.reactions.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {msg.reactions.map((r, idx) => {
+                              const hasReacted = r.userIds.some(uid => uid.toString() === (user?.userId || user?.id)?.toString());
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleAddReaction(msg._id || msg.messageId, r.emoji)}
+                                  className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full transition-all border ${hasReacted 
+                                    ? (isDarkMode ? 'bg-blue-500/30 border-blue-500 text-blue-200' : 'bg-blue-50 border-blue-200 text-blue-600') 
+                                    : (isDarkMode ? 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10' : 'bg-black/5 border-transparent text-gray-600 hover:bg-black/10')}`}
+                                >
+                                  <span>{r.emoji}</span>
+                                  <span className="font-bold">{r.userIds.length}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
 
@@ -588,7 +994,8 @@ export default function ChatPage() {
                         </span>
                       </div>
                     </div>
-                  </div>
+                  )}
+                </div>
                 );
               })}
               {typingStatus && (
@@ -632,14 +1039,30 @@ export default function ChatPage() {
 
               {/* Selected Files Preview */}
               {selectedFiles.length > 0 && (
-                <div className="flex gap-3 px-4 py-3 overflow-x-auto mb-2">
-                  {selectedFiles.map((file, idx) => (
-                    <div key={idx} className={`relative flex items-center gap-2 p-2 rounded-xl shadow-sm border whitespace-nowrap ${isDarkMode ? 'bg-white/10 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
-                      <span className="text-xl">{file.type.startsWith('image/') ? '🖼️' : file.type.startsWith('video/') ? '🎥' : '📄'}</span>
-                      <span className="text-sm font-medium truncate max-w-[150px]">{file.name}</span>
-                      <button type="button" onClick={() => removeSelectedFile(idx)} className="ml-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600">×</button>
-                    </div>
-                  ))}
+                <div className="flex gap-3 px-4 py-3 overflow-x-auto mb-2 bg-black/5 rounded-2xl mx-4">
+                  {selectedFiles.map((file, idx) => {
+                    const isImage = file.type.startsWith('image/');
+                    const previewUrl = isImage ? URL.createObjectURL(file) : null;
+                    return (
+                      <div key={idx} className={`relative group flex flex-col items-center gap-1 p-2 rounded-xl shadow-sm border min-w-[80px] max-w-[120px] ${isDarkMode ? 'bg-white/10 border-white/5' : 'bg-white border-gray-200'}`}>
+                        {isImage ? (
+                          <img src={previewUrl} className="w-16 h-16 object-cover rounded-lg shadow-sm" />
+                        ) : (
+                          <div className="w-16 h-16 flex items-center justify-center text-3xl bg-blue-500/10 rounded-lg">
+                            {file.type.startsWith('video/') ? '🎥' : file.type.startsWith('audio/') ? '🎵' : '📄'}
+                          </div>
+                        )}
+                        <span className="text-[10px] font-bold truncate w-full text-center px-1">{file.name}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => removeSelectedFile(idx)} 
+                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 shadow-md border-2 border-white transition-all scale-0 group-hover:scale-100"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -671,7 +1094,7 @@ export default function ChatPage() {
                 </div>
                 <button
                   type="submit"
-                  disabled={!messageInput.trim() || isUploading}
+                  disabled={(!messageInput.trim() && selectedFiles.length === 0) || isUploading}
                   className="w-14 h-14 bg-[#007AFF] text-white rounded-2xl flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 transition-all shadow-md flex-shrink-0"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 rotate-90 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
@@ -700,10 +1123,24 @@ export default function ChatPage() {
             </div>
             <div className="p-6 space-y-5">
               {/* Avatar */}
-              <div className="flex justify-center">
-                <div className="w-24 h-24 bg-[#007AFF] rounded-full flex items-center justify-center text-white font-bold text-4xl shadow-lg">
-                  {profileForm.username?.[0]?.toUpperCase() || '?'}
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative group">
+                  <div className="w-24 h-24 bg-[#007AFF] rounded-full flex items-center justify-center text-white font-bold text-4xl shadow-lg overflow-hidden">
+                    {user?.avatar ? (
+                      <img src={`${API_URL.replace('/api', '')}${user.avatar}`} className="w-full h-full object-cover" alt="Avatar" />
+                    ) : (
+                      profileForm.username?.[0]?.toUpperCase() || '?'
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => document.getElementById('avatarInput').click()}
+                    className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full text-xs font-bold"
+                  >
+                    Change
+                  </button>
                 </div>
+                <input id="avatarInput" type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                <p className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Click to change avatar</p>
               </div>
 
               {/* Username */}
@@ -766,43 +1203,173 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* New Chat Modal */}
-      {showNewChatModal && (
+      {/* Group Creation Modal */}
+      {showGroupModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className={`w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden transition-colors ${isDarkMode ? 'bg-[#1a4939] text-white border border-white/10' : 'bg-white text-black'}`}>
             <div className={`p-6 flex items-center justify-between border-b ${isDarkMode ? 'border-white/5' : 'border-gray-100'}`}>
-              <h3 className="text-xl font-bold">New Chat</h3>
-              <button onClick={() => { setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all">✕</button>
+              <h3 className="text-xl font-bold">New Group</h3>
+              <button onClick={() => setShowGroupModal(false)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all">✕</button>
             </div>
-            <div className="p-6">
+            <div className="p-6 space-y-4">
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); searchUsers(e.target.value); }}
-                placeholder="Search by name or email..."
-                autoFocus
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Group Name"
                 className={`w-full px-5 py-3 rounded-2xl border-none focus:ring-2 focus:ring-[#007AFF]/50 text-[15px] ${isDarkMode ? 'bg-white/5 text-white placeholder-gray-400' : 'bg-[#F2F2F7] text-black placeholder-gray-500'}`}
               />
-            </div>
-            <div className="max-h-72 overflow-y-auto px-6 pb-6 space-y-2">
-              {searchResults.length === 0 && searchQuery.length >= 2 && (
-                <p className={`text-center py-8 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No users found</p>
-              )}
-              {searchResults.map(u => (
-                <div
-                  key={u._id || u.userId}
-                  onClick={() => createDirectChat(u._id || u.userId)}
-                  className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center gap-4 ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-blue-50'}`}
-                >
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold shadow-sm ${isDarkMode ? 'bg-white/10 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                    {u.username?.[0]?.toUpperCase() || '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold truncate">{u.username}</p>
-                    <p className={`text-xs truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{u.email}</p>
-                  </div>
+              <textarea
+                value={groupDesc}
+                onChange={(e) => setGroupDesc(e.target.value)}
+                placeholder="Description (optional)"
+                rows={2}
+                className={`w-full px-5 py-3 rounded-2xl border-none focus:ring-2 focus:ring-[#007AFF]/50 text-[15px] resize-none ${isDarkMode ? 'bg-white/5 text-white placeholder-gray-400' : 'bg-[#F2F2F7] text-black placeholder-gray-500'}`}
+              />
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider opacity-60">Add Members</label>
+                <input
+                  type="text"
+                  onChange={(e) => searchUsers(e.target.value)}
+                  placeholder="Search users..."
+                  className={`w-full px-5 py-2 rounded-xl border-none focus:ring-2 focus:ring-[#007AFF]/50 text-xs ${isDarkMode ? 'bg-white/5 text-white' : 'bg-[#F2F2F7] text-black'}`}
+                />
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {searchResults.map(u => (
+                    <div key={u._id} onClick={() => {
+                      if (!groupMembers.find(m => m._id === u._id)) setGroupMembers([...groupMembers, u]);
+                    }} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer flex items-center gap-2">
+                      <div className="w-6 h-6 bg-[#007AFF] rounded-full text-[10px] flex items-center justify-center text-white">{u.username?.[0]}</div>
+                      <span className="text-sm">{u.username}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+                {groupMembers.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-2">
+                    {groupMembers.map(m => (
+                      <span key={m._id} className="text-[10px] bg-[#007AFF] text-white px-2 py-1 rounded-full flex items-center gap-1">
+                        {m.username}
+                        <button onClick={() => setGroupMembers(groupMembers.filter(gm => gm._id !== m._id))}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('auth_token');
+                    const res = await axios.post(`${API_URL}/groups/group`, {
+                      groupName, description: groupDesc, memberIds: groupMembers.map(m => m._id)
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+                    setChats(prev => [res.data.data, ...prev]);
+                    setShowGroupModal(false);
+                    setGroupName(''); setGroupDesc(''); setGroupMembers([]);
+                    alert('Group created! ✨');
+                  } catch (err) { alert('Failed to create group'); }
+                }}
+                disabled={!groupName.trim() || groupMembers.length === 0}
+                className="w-full py-3 bg-[#34C759] text-white rounded-2xl font-bold hover:bg-green-600 disabled:opacity-50 transition-all shadow-md text-sm"
+              >
+                Create Group
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supergroup Creation Modal */}
+      {showSupergroupModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden transition-colors ${isDarkMode ? 'bg-[#1a4939] text-white border border-white/10' : 'bg-white text-black'}`}>
+            <div className={`p-6 flex items-center justify-between border-b ${isDarkMode ? 'border-white/5' : 'border-gray-100'}`}>
+              <h3 className="text-xl font-bold">New Supergroup</h3>
+              <button onClick={() => setShowSupergroupModal(false)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all">✕</button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Supergroup Name"
+                className={`w-full px-5 py-3 rounded-2xl border-none focus:ring-2 focus:ring-[#007AFF]/50 text-[15px] ${isDarkMode ? 'bg-white/5 text-white placeholder-gray-400' : 'bg-[#F2F2F7] text-black placeholder-gray-500'}`}
+              />
+              
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider opacity-60">Topics</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTopic.name}
+                    onChange={(e) => setNewTopic({...newTopic, name: e.target.value})}
+                    placeholder="Topic Name"
+                    className={`flex-1 px-4 py-2 rounded-xl border-none text-xs ${isDarkMode ? 'bg-white/5 text-white' : 'bg-[#F2F2F7] text-black'}`}
+                  />
+                  <button onClick={() => {
+                    if (newTopic.name.trim()) {
+                      setTopics([...topics, newTopic]);
+                      setNewTopic({ name: '', description: '' });
+                    }
+                  }} className="px-4 py-2 bg-[#5856D6] text-white rounded-xl text-xs font-bold">Add</button>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {topics.map((t, i) => (
+                    <span key={i} className="text-[10px] bg-[#5856D6] text-white px-2 py-1 rounded-full flex items-center gap-1">
+                      #{t.name}
+                      {i > 0 && <button onClick={() => setTopics(topics.filter((_, idx) => idx !== i))}>×</button>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider opacity-60">Add Members</label>
+                <input
+                  type="text"
+                  onChange={(e) => searchUsers(e.target.value)}
+                  placeholder="Search users..."
+                  className={`w-full px-5 py-2 rounded-xl border-none focus:ring-2 focus:ring-[#007AFF]/50 text-xs ${isDarkMode ? 'bg-white/5 text-white' : 'bg-[#F2F2F7] text-black'}`}
+                />
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {searchResults.map(u => (
+                    <div key={u._id} onClick={() => {
+                      if (!groupMembers.find(m => m._id === u._id)) setGroupMembers([...groupMembers, u]);
+                    }} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer flex items-center gap-2">
+                      <div className="w-6 h-6 bg-[#007AFF] rounded-full text-[10px] flex items-center justify-center text-white">{u.username?.[0]}</div>
+                      <span className="text-sm">{u.username}</span>
+                    </div>
+                  ))}
+                </div>
+                {groupMembers.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-2">
+                    {groupMembers.map(m => (
+                      <span key={m._id} className="text-[10px] bg-[#007AFF] text-white px-2 py-1 rounded-full flex items-center gap-1">
+                        {m.username}
+                        <button onClick={() => setGroupMembers(groupMembers.filter(gm => gm._id !== m._id))}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('auth_token');
+                    const res = await axios.post(`${API_URL}/groups/supergroup`, {
+                      groupName, description: groupDesc, memberIds: groupMembers.map(m => m._id), topics
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+                    setChats(prev => [res.data.data, ...prev]);
+                    setShowSupergroupModal(false);
+                    setGroupName(''); setTopics([{ name: 'General', description: 'General discussion' }]); setGroupMembers([]);
+                    alert('Supergroup created! ✨');
+                  } catch (err) { alert('Failed to create supergroup'); }
+                }}
+                disabled={!groupName.trim() || groupMembers.length === 0 || topics.length === 0}
+                className="w-full py-4 bg-[#5856D6] text-white rounded-2xl font-bold hover:bg-purple-600 disabled:opacity-50 transition-all shadow-md text-sm"
+              >
+                Create Supergroup
+              </button>
             </div>
           </div>
         </div>
@@ -841,6 +1408,34 @@ export default function ChatPage() {
                   ⛔
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Chat Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 ${isDarkMode ? 'bg-[#1a4939] text-white border border-white/10' : 'bg-white text-black'}`}>
+            <div className="p-8 flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-red-500 text-white rounded-full flex items-center justify-center text-3xl mb-4 shadow-lg">⚠️</div>
+              <h3 className="text-xl font-bold mb-2">Clear History?</h3>
+              <p className={`text-sm mb-8 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Are you sure you want to delete ALL messages in this chat? This cannot be undone.</p>
+              
+              <div className="w-full flex flex-col gap-2">
+                <button 
+                  onClick={handleClearChat}
+                  className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 transition-all shadow-lg"
+                >
+                  Yes, clear everything
+                </button>
+                <button 
+                  onClick={() => setShowClearConfirm(false)}
+                  className={`w-full py-4 rounded-2xl font-bold transition-all ${isDarkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'}`}
+                >
+                  No, keep messages
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -96,6 +96,7 @@ module.exports = {
     LEAVE_CHAT: 'leave-chat',
     USER_JOINED: 'user-joined',
     USER_LEFT: 'user-left',
+    CHAT_CLEARED: 'chat-cleared',
 
     // Messages
     NEW_MESSAGE: 'new-message',

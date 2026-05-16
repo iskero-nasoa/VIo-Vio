@@ -426,3 +426,33 @@ exports.switchTopic = async (req, res) => {
     res.status(500).json({ error: 'An error occurred while switching topic' });
   }
 };
+/**
+ * Clear chat history (delete all messages)
+ */
+exports.clearChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const currentUserId = req.user.userId || req.user.id;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ error: 'Chat not found' });
+
+    // Verify membership
+    if (!chat.members.map(m => m.toString()).includes(currentUserId.toString())) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    // Delete all messages for this chat
+    await Message.deleteMany({ chatId });
+
+    // Emit via WebSocket
+    const { emitToChat } = require('../websocket/socketManager');
+    const { WS_EVENTS } = require('../config/constants');
+    emitToChat(chatId, WS_EVENTS.CHAT_CLEARED, { chatId });
+
+    res.status(200).json({ message: 'Chat history cleared successfully' });
+  } catch (error) {
+    console.error('clearChat error:', error);
+    res.status(500).json({ error: 'An error occurred while clearing chat' });
+  }
+};

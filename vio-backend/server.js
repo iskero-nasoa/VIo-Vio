@@ -109,6 +109,8 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 const fileRoutes = require('./src/routes/fileRoutes');
+const groupRoutes = require('./src/routes/groupRoutes');
 const express = require('express');
 app.use('/api/files', fileRoutes);
+app.use('/api/groups', groupRoutes);
 app.use('/uploads', express.static('uploads'));

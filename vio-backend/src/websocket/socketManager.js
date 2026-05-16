@@ -156,7 +156,7 @@ const initSocket = (server) => {
         if (!messageData || !messageData.chatId) return;
         const chatId = messageData.chatId.toString();
 
-        socket.to(chatId).emit(WS_EVENTS.RECEIVE_MESSAGE, messageData);
+        io.to(chatId).emit(WS_EVENTS.RECEIVE_MESSAGE, messageData);
 
         socket.emit(WS_EVENTS.MESSAGE_DELIVERED, {
           messageId: messageData._id || messageData.messageId,

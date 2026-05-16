@@ -18,10 +18,11 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    const { avatar, statusMessage, phoneNumber, status } = req.body;
+    const { username, avatar, statusMessage, phoneNumber, status } = req.body;
     
     const updateData = {};
 
+    if (username !== undefined) updateData.username = username;
     if (avatar !== undefined) updateData.avatar = avatar;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
     

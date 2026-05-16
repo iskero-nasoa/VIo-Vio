@@ -216,31 +216,27 @@ exports.editMessage = async (req, res) => {
  */
 exports.deleteMessage = async (req, res) => {
   try {
-    const { messageId } = req.params;
-    const userId = getUserId(req);
-
-    const message = await Message.findById(messageId);
-    if (!message) return res.status(404).json({ error: 'Message not found' });
-
-    // Sender or chat admin can delete
-    const chat = await Chat.findById(message.chatId);
-    const isSender = message.senderId.toString() === userId;
-    const isAdmin = chat && chat.admin && chat.admin.toString() === userId;
-
-    if (!isSender && !isAdmin) {
-      return res.status(403).json({ error: 'Permission denied. Only the sender or chat admin can delete this message.' });
+    const message = await Message.findById(req.params.messageId);
+    if (!message) return res.status(404).json({message: 'Not found'});
+    
+    const userId = (req.user.userId || req.user.id).toString();
+    // Check if user is sender
+    if (message.senderId.toString() !== userId) {
+      return res.status(403).json({message: 'Not authorized'});
     }
-
+    
     const chatId = message.chatId.toString();
-    await Message.findByIdAndDelete(messageId);
-
-    // ── Emit via WebSocket ────────────────────────────
+    const messageId = message._id.toString();
+    
+    await Message.deleteOne({_id: req.params.messageId});
+    
+    // Notify via WebSocket
     emitToChat(chatId, WS_EVENTS.MESSAGE_REMOVED, { messageId, chatId });
-
-    res.status(200).json({ message: 'Message deleted successfully' });
-  } catch (error) {
-    console.error('deleteMessage error:', error);
-    res.status(500).json({ error: 'An error occurred while deleting the message' });
+    
+    res.json({success: true});
+  } catch (e) {
+    console.error('Delete failed:', e);
+    res.status(500).json({message: 'Delete failed'});
   }
 };
 
