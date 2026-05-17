@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  email       String   @unique
+  password    String
+  avatar      String?
+  description String   @default("")
+  status      String   @default("offline")
+  statusText  String   @default("")
+  phone       String   @default("")
+  role        String   @default("user")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chatParticipants      ChatParticipant[]
+  sentMessages          Message[]          @relation("MessageSender")
+  groupMemberships      GroupMember[]
+  adminOfGroups         Group[]
+  supergroupMemberships SupergroupMember[]
+  adminOfSupergroups    Supergroup[]       @relation("SupergroupAdmin")
+  deletedMessages       DeletedMessage[]
+  callsMade             CallLog[]          @relation("CallCaller")
+  callsReceived         CallLog[]          @relation("CallReceiver")
+}
+
+model Chat {
+  id        String   @id @default(cuid())
+  type      String   @default("direct")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ChatParticipant[]
+  messages     Message[]
+}
+
+model ChatParticipant {
+  chatId String
+  userId String
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([chatId, userId])
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  avatar      String?
+  adminId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  admin    User          @relation(fields: [adminId], references: [id])
+  members  GroupMember[]
+  messages Message[]
+}
+
+model GroupMember {
+  groupId String
+  userId  String
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+}
+
+model Supergroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  avatar      String?
+  isPublic    Boolean  @default(true)
+  maxMembers  Int      @default(1000)
+  adminId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  admin    User               @relation("SupergroupAdmin", fields: [adminId], references: [id])
+  members  SupergroupMember[]
+  topics   Topic[]
+}
+
+model SupergroupMember {
+  supergroupId String
+  userId       String
+  role         String   @default("member")
+  joinedAt     DateTime @default(now())
+
+  supergroup Supergroup @relation(fields: [supergroupId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([supergroupId, userId])
+}
+
+model Topic {
+  id           String   @id @default(cuid())
+  supergroupId String
+  name         String
+  description  String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  supergroup Supergroup @relation(fields: [supergroupId], references: [id], onDelete: Cascade)
+  messages   Message[]
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  chatId      String?
+  groupId     String?
+  topicId     String?
+  senderId    String
+  text        String   @default("")
+  attachments String   @default("[]")
+  replyToId   String?
+  status      String   @default("sent")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chat      Chat?            @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  group     Group?           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  topic     Topic?           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  sender    User             @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo   Message?         @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies   Message[]        @relation("MessageReplies")
+  deleted   DeletedMessage[]
+  reactions Reaction[]
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+model DeletedMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  messageId String
+  deletedAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+}
+
+model CallLog {
+  id         String    @id @default(cuid())
+  callerId   String
+  receiverId String
+  type       String
+  status     String    @default("missed")
+  duration   Int       @default(0)
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  caller   User @relation("CallCaller", fields: [callerId], references: [id])
+  receiver User @relation("CallReceiver", fields: [receiverId], references: [id])
+}

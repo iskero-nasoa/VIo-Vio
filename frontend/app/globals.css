@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+/* ── Dark mode (default) ── */
+:root,
+.dark {
+  --background: #173f35;
+  --foreground: #f1f5f9;
+  --card: #0f2420;
+  --border: rgba(255, 255, 255, 0.08);
+  --primary: #06b6d4;
+  --primary-foreground: #ffffff;
+  --secondary: #1a3a30;
+  --muted: #1a3a30;
+  --muted-foreground: #94a3b8;
+  --accent: #06b6d4;
+  --danger: #ff4757;
+
+  --btn-chat: #06b6d4;
+  --btn-chat-hover: #0891b2;
+  --btn-chat-text: #ffffff;
+  --btn-group: #14b8a6;
+  --btn-group-hover: #0d9488;
+  --btn-group-text: #ffffff;
+  --btn-super: #8b5cf6;
+  --btn-super-hover: #7c3aed;
+  --btn-super-text: #ffffff;
+
+  --bubble-sent-from: #0891b2;
+  --bubble-sent-to: #06b6d4;
+  --bubble-received-bg: #1a3a30;
+}
+
+/* ── Light mode ── */
+.light {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #f8f9fa;
+  --border: #e5e7eb;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --muted: #f1f5f9;
+  --muted-foreground: #6b7280;
+  --accent: #3b82f6;
+  --danger: #ef4444;
+
+  --btn-chat: #3b82f6;
+  --btn-chat-hover: #2563eb;
+  --btn-chat-text: #ffffff;
+  --btn-group: #10b981;
+  --btn-group-hover: #059669;
+  --btn-group-text: #ffffff;
+  --btn-super: #8b5cf6;
+  --btn-super-hover: #7c3aed;
+  --btn-super-text: #ffffff;
+
+  --bubble-sent-from: #2563eb;
+  --bubble-sent-to: #3b82f6;
+  --bubble-received-bg: #f1f5f9;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Smooth theme transition on every element */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+/* Don't slow down interactive states */
+button, a, input, textarea, select {
+  transition-duration: 100ms;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+/* ── Action buttons (pill shape) ── */
+.btn-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: none;
+  flex: 1;
+  transition: transform 80ms ease, filter 100ms ease;
+}
+.btn-action:active { transform: scale(0.96); }
+.btn-action:hover { filter: brightness(1.1); }
+
+.btn-chat  { background: var(--btn-chat);  color: var(--btn-chat-text);  }
+.btn-group { background: var(--btn-group); color: var(--btn-group-text); }
+.btn-super { background: var(--btn-super); color: var(--btn-super-text); }
+
+/* ── Message bubbles ── */
+.bubble-sent {
+  background: linear-gradient(135deg, var(--bubble-sent-from), var(--bubble-sent-to));
+  color: #fff;
+  @apply rounded-2xl rounded-br-sm px-4 py-2.5 max-w-xs shadow-md;
+}
+.bubble-received {
+  background: var(--bubble-received-bg);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  @apply rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-xs shadow-sm;
+}
+
+.custom-audio-player::-webkit-media-controls-panel {
+  background-color: var(--secondary);
+}
+
+@keyframes recording-bar {
+  0%   { transform: scaleX(0); opacity: 0.5; }
+  50%  { transform: scaleX(1); opacity: 1;   }
+  100% { transform: scaleX(0); opacity: 0.5; }
+}
+.animate-recording-bar {
+  animation: recording-bar 2s infinite ease-in-out;
+  transform-origin: left;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+
+@keyframes pulse-ring {
+  0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(6,182,212,0.4);  }
+  70%  { transform: scale(1);    box-shadow: 0 0 0 10px rgba(6,182,212,0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(6,182,212,0);   }
+}
+.animate-pulse-ring { animation: pulse-ring 2s infinite; }
