@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   soundEnabled: true,
 };
 
-const STORAGE_KEY = "isko_notification_settings";
+const STORAGE_KEY = "vioapp_notification_settings";
 
 export const getNotificationSettings = (): NotificationSettings => {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
@@ -70,7 +70,7 @@ export const useNotifications = () => {
         const notification = new Notification(title, {
           body,
           icon: icon || "/favicon.ico",
-          tag: `isko-${Date.now()}`,
+          tag: `vioapp-${Date.now()}`,
           silent: true,
         });
         setTimeout(() => notification.close(), 5000);

@@ -8,22 +8,24 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
-  // Avoid hydration mismatch
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  React.useEffect(() => { setMounted(true); }, []);
 
-  if (!mounted) {
-    return <div className="w-9 h-9" />;
-  }
+  // Render a placeholder that matches the button size to avoid layout shift
+  if (!mounted) return <div style={{ width: 32, height: 32 }} />;
+
+  const isDark = theme === "dark";
 
   return (
     <button
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="w-9 h-9 flex items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-muted transition-all active:scale-95"
-      aria-label="Toggle theme"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? "Light mode" : "Dark mode"}
+      className="p-2 rounded-lg"
+      style={{ color: "var(--muted-foreground)" }}
+      onMouseEnter={e => (e.currentTarget.style.background = "var(--secondary)")}
+      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
     >
-      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+      {isDark ? <Sun size={15} /> : <Moon size={15} />}
     </button>
   );
 }

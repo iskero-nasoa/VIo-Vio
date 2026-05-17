@@ -106,20 +106,28 @@ export const useChat = (chatId: string | null) => {
       setMessages((prev) => prev.filter((m) => m._id !== deletedMessageId));
     };
 
+    const handleReactionUpdated = (data: { messageId: string; reactions: any[] }) => {
+      setMessages((prev) =>
+        prev.map((m) => (m._id === data.messageId ? { ...m, reactions: data.reactions } : m))
+      );
+    };
+
     socket.on("message_received", handleMessage);
     socket.on("user_typing", handleTyping);
     socket.on("message_deleted", handleMessageDeleted);
+    socket.on("reaction_updated", handleReactionUpdated);
 
     return () => {
       socket.off("message_received", handleMessage);
       socket.off("user_typing", handleTyping);
       socket.off("message_deleted", handleMessageDeleted);
+      socket.off("reaction_updated", handleReactionUpdated);
       socket.emit("leave_chat", chatId);
     };
   }, [socket, connected, chatId, user]);
 
   const sendMessage = useCallback(
-    async (text: string, attachments?: any[], replyToId?: string) => {
+    async (text: string, attachments?: any[]) => {
       if (!chatId || !socket || !user) return;
       if (!text.trim() && (!attachments || attachments.length === 0)) return;
 
@@ -139,15 +147,14 @@ export const useChat = (chatId: string | null) => {
       };
 
       setMessages((prev) => [...prev, optimisticMessage]);
-      
+
       try {
-        socket.emit("send_message", { 
-          chatId, 
-          text, 
+        socket.emit("send_message", {
+          chatId,
+          text,
           senderId: user.id,
           attachments,
-          replyTo: replyToId,
-          tempId 
+          tempId
         });
         
         // Clear typing status

@@ -1,21 +1,20 @@
 import { Server, Socket } from "socket.io";
-import Message from "../models/Message";
-import Topic from "../models/Topic";
-import User from "../models/User";
-import mongoose from "mongoose";
+import { prisma } from "../config/prisma";
 
 interface SocketWithUser extends Socket {
   userId?: string;
 }
 
 export const setupTopicSocket = (io: Server, socket: SocketWithUser) => {
-  // Join a topic room
-  socket.on("join_topic", (data: { topicId: string; groupId: string }) => {
+  socket.on("join_topic", (data: { topicId: string; groupId?: string }) => {
     socket.join(`topic_${data.topicId}`);
-    console.log(`🔌 Socket ${socket.id} joined topic: ${data.topicId}`);
+    if (data.groupId) socket.join(`supergroup_${data.groupId}`);
   });
 
-  // Send message to a topic
+  socket.on("leave_topic", (topicId: string) => {
+    socket.leave(`topic_${topicId}`);
+  });
+
   socket.on(
     "send_topic_message",
     async (data: {
@@ -28,84 +27,62 @@ export const setupTopicSocket = (io: Server, socket: SocketWithUser) => {
       tempId?: string;
     }) => {
       try {
-        if (!data.text.trim() && (!data.attachments || data.attachments.length === 0)) {
-          return;
-        }
+        if (!data.text?.trim() && (!data.attachments || data.attachments.length === 0)) return;
 
-        const message = await Message.create({
-          chatId: new mongoose.Types.ObjectId(data.groupId),
-          topicId: new mongoose.Types.ObjectId(data.topicId),
-          senderId: new mongoose.Types.ObjectId(data.senderId),
-          text: data.text,
-          attachments: data.attachments || [],
-          replyTo: data.replyTo ? new mongoose.Types.ObjectId(data.replyTo) : undefined,
-        });
-
-        // Push message to topic's messages array
-        await Topic.findByIdAndUpdate(data.topicId, {
-          $push: { messages: message._id },
-        });
-
-        const populated = await message.populate([
-          { path: "senderId", select: "username avatar" },
-          {
-            path: "replyTo",
-            populate: { path: "senderId", select: "username" },
+        const message = await prisma.message.create({
+          data: {
+            topicId: data.topicId,
+            senderId: data.senderId,
+            text: data.text || "",
+            attachments: JSON.stringify(data.attachments || []),
+            replyToId: data.replyTo || null,
           },
-        ]);
-
-        // Broadcast to the topic room
-        io.to(`topic_${data.topicId}`).emit("topic_message_received", {
-          _id: populated._id,
-          chatId: populated.chatId,
-          topicId: data.topicId,
-          groupId: data.groupId,
-          senderId: populated.senderId,
-          text: populated.text,
-          attachments: populated.attachments,
-          replyTo: populated.replyTo,
-          createdAt: populated.createdAt,
-          senderUsername: (populated.senderId as any).username,
-          senderAvatar: (populated.senderId as any).avatar,
-          tempId: data.tempId,
+          include: {
+            sender: { select: { id: true, username: true, avatar: true } },
+            replyTo: { include: { sender: { select: { id: true, username: true } } } },
+          },
         });
 
-        // Also notify the supergroup room for sidebar last-message updates
-        io.to(`supergroup_${data.groupId}`).emit("group_message_received", {
-          _id: populated._id,
-          chatId: populated.chatId,
-          topicId: data.topicId,
-          groupId: data.groupId,
-          senderId: populated.senderId,
-          text: populated.text,
-          createdAt: populated.createdAt,
-          senderUsername: (populated.senderId as any).username,
-          tempId: data.tempId,
+        await prisma.supergroup.update({
+          where: { id: data.groupId },
+          data: { updatedAt: new Date() },
         });
+
+        const formatted = {
+          _id: message.id,
+          id: message.id,
+          topicId: data.topicId,
+          text: message.text,
+          attachments: JSON.parse(message.attachments || "[]"),
+          createdAt: message.createdAt,
+          tempId: data.tempId,
+          senderId: { _id: message.sender.id, ...message.sender },
+          senderUsername: message.sender.username,
+          senderAvatar: message.sender.avatar,
+          replyTo: message.replyTo
+            ? { _id: message.replyTo.id, text: message.replyTo.text, senderId: message.replyTo.sender }
+            : null,
+        };
+
+        io.to(`topic_${data.topicId}`).emit("topic_message_received", formatted);
       } catch (error) {
-        console.error("Error saving/sending topic message via socket:", error);
+        console.error("Error saving topic message:", error);
       }
     }
   );
 
-  // Topic typing indicator
-  socket.on(
-    "topic_typing",
-    async (data: { topicId: string; userId: string; isTyping: boolean }) => {
-      const user = await User.findById(data.userId).select("username");
-      if (user) {
-        socket.to(`topic_${data.topicId}`).emit("topic_user_typing", {
-          topicId: data.topicId,
-          userId: data.userId,
-          username: user.username,
-          isTyping: data.isTyping,
-        });
-      }
-    }
-  );
-
-  // Leave topic room
-  socket.on("leave_topic", (topicId: string) => {
-    socket.leave(`topic_${topicId}`);
+  socket.on("topic_typing", (data: { topicId: string; userId: string; isTyping: boolean }) => {
+    prisma.user
+      .findUnique({ where: { id: data.userId }, select: { username: true } })
+      .then((user) => {
+        if (user) {
+          socket.to(`topic_${data.topicId}`).emit("topic_user_typing", {
+            topicId: data.topicId,
+            userId: data.userId,
+            username: user.username,
+            isTyping: data.isTyping,
+          });
+        }
+      });
   });
 };

@@ -17,16 +17,22 @@ export interface Attachment {
   size: number;
 }
 
+export interface Reaction {
+  emoji: string;
+  count: number;
+  userIds: string[];
+}
+
 export interface Message {
   _id: string;
   chatId: string;
   senderId: string | User;
   text: string;
   attachments?: Attachment[];
-  replyTo?: Message;
   status: "sent" | "delivered" | "read";
   createdAt: string;
   updatedAt: string;
+  reactions?: Reaction[];
   // UI helpers
   senderUsername?: string;
   senderAvatar?: string;

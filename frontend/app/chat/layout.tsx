@@ -7,46 +7,38 @@ import { useCall } from "@/context/CallContext";
 import { ChatList } from "@/components/Chat/ChatList";
 import { CallNotification } from "@/components/Chat/CallNotification";
 import { CallModal } from "@/components/Chat/CallModal";
-import { LogOut, MessageCircle, User as UserIcon } from "lucide-react";
-import Link from "next/link";
-import { UserAvatar } from "@/components/Common/UserAvatar";
 import { ThemeToggle } from "@/components/Common/ThemeToggle";
+import { UserAvatar } from "@/components/Common/UserAvatar";
+import { LogOut } from "lucide-react";
+import Link from "next/link";
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const {
-    callState,
-    incomingCall,
-    localVideoRef,
-    remoteVideoRef,
-    answerCall,
-    rejectCall,
-    endCall,
-    toggleAudio,
-    toggleVideo,
+    callState, incomingCall,
+    localVideoRef, remoteVideoRef,
+    answerCall, endCall, toggleAudio, toggleVideo,
   } = useCall();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/auth/login");
-    }
+    if (!isLoading && !isAuthenticated) router.push("/auth/login");
   }, [isLoading, isAuthenticated, router]);
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Loading...</p>
+          <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm">Loading VioApp...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden relative">
-      {/* Call UI */}
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* ── Call overlays ── */}
       {incomingCall && (
         <CallNotification
           callerId={incomingCall.callerId}
@@ -54,10 +46,9 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           callerAvatar={incomingCall.callerAvatar}
           type={incomingCall.type}
           onAnswer={answerCall}
-          onReject={rejectCall}
+          onReject={() => answerCall(false)}
         />
       )}
-
       {callState.status !== "idle" && (
         <CallModal
           callState={callState}
@@ -69,33 +60,62 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
         />
       )}
 
-      {/* Sidebar */}
-      <aside className="w-80 bg-card border-r border-border flex flex-col shrink-0">
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between mb-4">
-            <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <UserAvatar user={{ username: user.username, avatar: user.avatar }} size="sm" />
-              <span className="font-bold text-sm truncate max-w-[120px]">{user.username}</span>
-            </Link>
-            <div className="flex items-center gap-1">
-              <ThemeToggle />
-              <button
-                onClick={logout}
-                className="text-muted-foreground hover:text-red-500 p-2 transition-colors"
-                title="Выйти"
-              >
-                <LogOut size={18} />
-              </button>
+      {/* ── Sidebar ── */}
+      <aside
+        className="w-72 flex flex-col shrink-0"
+        style={{ background: "var(--card)", borderRight: "1px solid var(--border)" }}
+      >
+        {/* Profile row */}
+        <div
+          className="px-4 py-3 flex items-center gap-3"
+          style={{ borderBottom: "1px solid var(--border)" }}
+        >
+          {/* Avatar + name + status */}
+          <Link href="/profile" className="flex items-center gap-3 flex-1 min-w-0 group">
+            <div className="relative shrink-0">
+              <UserAvatar
+                user={{ username: user.username, avatar: user.avatar, status: "online" }}
+                size="md"
+                showStatus={false}
+              />
+              {/* green dot */}
+              <span
+                className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2"
+                style={{ background: "#22c55e", borderColor: "var(--card)" }}
+              />
             </div>
-          </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate leading-tight">
+                {user.username}
+              </p>
+              <p className="text-xs" style={{ color: "#22c55e" }}>online</p>
+            </div>
+          </Link>
 
+          {/* Controls: theme toggle + logout */}
+          <div className="flex items-center gap-1 shrink-0">
+            <ThemeToggle />
+            <button
+              onClick={logout}
+              title="Log out"
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: "var(--danger)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.12)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Chat list (includes search + action buttons + items) */}
+        <div className="flex-1 overflow-hidden flex flex-col">
           <ChatList currentUserId={user.id} />
         </div>
       </aside>
 
-      {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col bg-background relative">
+      {/* ── Main area ── */}
+      <main className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--background)" }}>
         {children}
       </main>
     </div>

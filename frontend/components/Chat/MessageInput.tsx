@@ -5,24 +5,18 @@ import { SendHorizontal, Paperclip, Smile, X, FileVideo, Loader2, Mic } from "lu
 import { api } from "../../utils/api";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { useTheme } from "next-themes";
-import { Message } from "../../types/chat";
-import { Reply, CornerDownLeft } from "lucide-react";
 import { VoiceRecorder } from "./VoiceRecorder";
 
 interface MessageInputProps {
-  onSendMessage: (text: string, attachments?: any[], replyToId?: string) => void;
+  onSendMessage: (text: string, attachments?: any[]) => void;
   onTyping: (isTyping: boolean) => void;
   disabled?: boolean;
-  replyTo?: Message | null;
-  onCancelReply?: () => void;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   onTyping,
   disabled = false,
-  replyTo = null,
-  onCancelReply,
 }) => {
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -32,7 +26,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const { theme } = useTheme();
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
@@ -102,11 +95,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       setIsUploading(false);
     }
 
-    onSendMessage(trimmed, attachments, replyTo?._id);
+    onSendMessage(trimmed, attachments);
     setText("");
     clearFile();
     onTyping(false);
-    if (onCancelReply) onCancelReply();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -129,8 +121,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         setUploadProgress(percent);
       });
 
-      onSendMessage("", [{ ...uploadRes, type: "audio" }], replyTo?._id);
-      if (onCancelReply) onCancelReply();
+      onSendMessage("", [{ ...uploadRes, type: "audio" }]);
     } catch (error) {
       console.error("Voice upload failed:", error);
       alert("Failed to send voice message.");
@@ -141,29 +132,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <div className="flex flex-col bg-card space-y-2 relative">
-      {/* Reply Preview */}
-      {replyTo && (
-        <div className="flex items-center gap-3 bg-secondary/50 p-3 rounded-2xl border-l-4 border-primary animate-in slide-in-from-bottom-2 duration-300 mb-1">
-          <div className="text-primary shrink-0">
-            <Reply size={18} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-0.5">
-              Ответ для {typeof replyTo.senderId === 'string' ? '...' : (replyTo.senderId as any).username}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              {replyTo.text || (replyTo.attachments?.length ? "Вложение" : "...")}
-            </p>
-          </div>
-          <button 
-            onClick={onCancelReply}
-            className="text-muted-foreground hover:text-foreground p-1 transition-colors"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
       {/* File Preview */}
       {selectedFile && (
         <div className="relative flex items-center bg-secondary p-2 rounded-lg self-start max-w-sm group border border-border transition-all animate-fadeIn">
@@ -220,7 +188,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               className="absolute bottom-16 left-0 z-50 animate-fadeIn"
             >
               <EmojiPicker
-                theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
+                theme={theme === "light" ? Theme.LIGHT : Theme.DARK}
                 onEmojiClick={onEmojiClick}
                 autoFocusSearch={false}
                 searchPlaceholder="Поиск эмодзи..."

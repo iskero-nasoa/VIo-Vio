@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from "express";
+import { User } from "@prisma/client";
 import { verifyToken } from "../utils/jwt";
-import User, { IUser } from "../models/User";
+import { prisma } from "../config/prisma";
 
-// Extend Express Request to include user
 declare global {
   namespace Express {
     interface Request {
-      user?: IUser;
+      user?: User;
     }
   }
 }
@@ -27,7 +27,7 @@ export async function authMiddleware(
     const token = authHeader.split(" ")[1];
     const decoded = verifyToken(token);
 
-    const user = await User.findById(decoded.userId);
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     if (!user) {
       res.status(401).json({ message: "Пользователь не найден" });
       return;

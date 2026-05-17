@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Search, UserPlus, X, MessageSquareOff, Users, Hash, Globe } from "lucide-react";
+import { Search, MessageSquarePlus, Users, X, Hash, Globe, MessageSquareOff } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { api } from "../../utils/api";
 import { UserAvatar } from "../Common/UserAvatar";
 import { formatDistanceToNow } from "date-fns";
-import { ru } from "date-fns/locale";
 import { NewChatModal } from "./NewChatModal";
 import { CreateGroupModal } from "./CreateGroupModal";
 import { CreateSupergroupModal } from "./CreateSupergroupModal";
@@ -58,177 +57,133 @@ export const ChatList: React.FC<ChatListProps> = ({ currentUserId }) => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Join rooms for all chats, groups, and supergroups
   useEffect(() => {
     if (!socket || !connected || loading) return;
-
     chats.forEach((chat) => socket.emit("join_chat", { chatId: chat._id, userId: currentUserId }));
-    groups.forEach((group) => socket.emit("join_group", group._id));
-    supergroups.forEach((sg) => socket.emit("join_supergroup", sg._id));
-
-    // Also join personal room
+    groups.forEach((group) => socket.emit("join_group", { groupId: group._id, userId: currentUserId }));
     socket.emit("join_user_room", currentUserId);
-  }, [socket, connected, loading, chats.length, groups.length, supergroups.length, currentUserId]);
+  }, [socket, connected, loading, chats.length, groups.length, currentUserId]);
 
   useEffect(() => {
     if (!socket || !connected) return;
 
     const handleMessageReceived = (message: any) => {
       setChats((prev) => {
-        const chatIndex = prev.findIndex((c) => c._id === message.chatId);
-        if (chatIndex === -1) {
-          fetchAll();
-          return prev;
-        }
-        const updatedChat = {
-          ...prev[chatIndex],
-          messages: [message],
-          updatedAt: message.createdAt,
-        };
-        const otherChats = prev.filter((_, i) => i !== chatIndex);
-        return [updatedChat, ...otherChats];
+        const idx = prev.findIndex((c) => c._id === message.chatId);
+        if (idx === -1) { fetchAll(); return prev; }
+        const updated = { ...prev[idx], messages: [message], updatedAt: message.createdAt };
+        return [updated, ...prev.filter((_, i) => i !== idx)];
       });
     };
 
-    const handleGroupMessageReceived = (message: any) => {
+    const handleGroupMessage = (message: any) => {
       setGroups((prev) => {
-        const groupIndex = prev.findIndex((g) => g._id === message.groupId || g._id === message.chatId);
-        if (groupIndex !== -1) {
-          const updatedGroup = {
-            ...prev[groupIndex],
-            messages: [message],
-            updatedAt: message.createdAt,
-          };
-          const otherGroups = prev.filter((_, i) => i !== groupIndex);
-          return [updatedGroup, ...otherGroups];
-        }
-        return prev;
-      });
-
-      setSupergroups((prev) => {
-        const sgIndex = prev.findIndex((sg) => sg._id === message.groupId || sg._id === message.chatId);
-        if (sgIndex !== -1) {
-          const updatedSg = {
-            ...prev[sgIndex],
-            lastMessage: message, // Store the actual message object
-            updatedAt: message.createdAt,
-          };
-          const otherSg = prev.filter((_, i) => i !== sgIndex);
-          return [updatedSg, ...otherSg];
-        }
-        return prev;
+        const idx = prev.findIndex((g) => g._id === (message.groupId || message.chatId));
+        if (idx === -1) return prev;
+        const updated = { ...prev[idx], messages: [message], updatedAt: message.createdAt };
+        return [updated, ...prev.filter((_, i) => i !== idx)];
       });
     };
 
-    const handleTopicMessage = (message: any) => {
-      // Re-use group message logic as they share the same sidebar behavior
-      handleGroupMessageReceived(message);
+    const handleGroupCreated = (group: any) => {
+      setGroups((prev) => prev.some((g) => g._id === group._id) ? prev : [group, ...prev]);
+    };
+
+    const handleSupergroupCreated = (sg: any) => {
+      setSupergroups((prev) => prev.some((s) => s._id === sg._id) ? prev : [sg, ...prev]);
     };
 
     socket.on("message_received", handleMessageReceived);
-    socket.on("group_message_received", handleGroupMessageReceived);
-    socket.on("topic_message_received", handleTopicMessage);
-
+    socket.on("group_message_received", handleGroupMessage);
+    socket.on("group_created", handleGroupCreated);
+    socket.on("supergroup_created", handleSupergroupCreated);
     return () => {
       socket.off("message_received", handleMessageReceived);
-      socket.off("group_message_received", handleGroupMessageReceived);
-      socket.off("topic_message_received", handleTopicMessage);
+      socket.off("group_message_received", handleGroupMessage);
+      socket.off("group_created", handleGroupCreated);
+      socket.off("supergroup_created", handleSupergroupCreated);
     };
   }, [socket, connected, fetchAll]);
 
-  // Build unified list
   const unifiedItems: UnifiedItem[] = [
-    // Direct chats
     ...chats.map((chat) => {
-      const otherParticipant = chat.participants.find((p: any) => p._id !== currentUserId);
+      const other = chat.participants?.find((p: any) => (p._id || p.id) !== currentUserId);
       const lastMsg = chat.messages?.[0];
       return {
-        id: chat._id,
+        id: chat._id || chat.id,
         type: "direct" as const,
-        name: otherParticipant?.username || "Chat",
-        avatar: otherParticipant?.avatar,
-        status: otherParticipant?.status,
+        name: other?.username || "Chat",
+        avatar: other?.avatar,
+        status: other?.status,
         lastMessage: lastMsg?.text || "",
         lastMessageTime: chat.updatedAt,
         raw: chat,
       };
     }),
-    // Groups
     ...groups.map((group) => {
       const lastMsg = group.messages?.[0];
-      const senderName = lastMsg?.senderUsername || lastMsg?.senderId?.username;
+      const sender = lastMsg?.senderUsername || lastMsg?.senderId?.username;
       return {
-        id: group._id,
+        id: group._id || group.id,
         type: "group" as const,
         name: group.name,
         avatar: group.avatar,
-        lastMessage: lastMsg
-          ? `${senderName ? senderName + ": " : ""}${lastMsg.text || "Вложение"}`
-          : "",
+        lastMessage: lastMsg ? `${sender ? sender + ": " : ""}${lastMsg.text || "Attachment"}` : "",
         lastMessageTime: group.updatedAt,
         memberCount: group.members?.length || 0,
         raw: group,
       };
     }),
-    // Supergroups
     ...supergroups.map((sg) => {
       const lastMsg = sg.lastMessage;
-      const senderName = lastMsg?.senderUsername;
       return {
-        id: sg._id,
+        id: sg._id || sg.id,
         type: "supergroup" as const,
         name: sg.name,
         avatar: sg.avatar,
-        lastMessage: lastMsg
-          ? `${senderName ? senderName + ": " : ""}${lastMsg.text || "Вложение"}`
-          : "",
+        lastMessage: lastMsg?.text || "",
         lastMessageTime: sg.updatedAt,
         memberCount: sg.members?.length || 0,
         raw: sg,
       };
     }),
   ].sort((a, b) => {
-    const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
-    const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
-    return timeB - timeA;
+    const tA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+    const tB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+    return tB - tA;
   });
 
-  const filteredItems = unifiedItems.filter((item) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      item.name.toLowerCase().includes(query) ||
-      (item.lastMessage?.toLowerCase() || "").includes(query)
-    );
+  const filtered = unifiedItems.filter((item) => {
+    const q = searchQuery.toLowerCase();
+    return item.name.toLowerCase().includes(q) || (item.lastMessage?.toLowerCase() || "").includes(q);
   });
 
-  const formatMessageTime = (date: string) => {
+  const fmtTime = (date?: string) => {
     if (!date) return "";
-    return formatDistanceToNow(new Date(date), { addSuffix: false, locale: ru });
+    try {
+      return formatDistanceToNow(new Date(date), { addSuffix: false });
+    } catch {
+      return "";
+    }
   };
 
-  const handleItemClick = (item: UnifiedItem) => {
-    if (item.type === "supergroup") {
-      router.push(`/chat/supergroup/${item.id}`);
-    } else if (item.type === "group") {
-      router.push(`/chat/group/${item.id}`);
-    } else {
-      router.push(`/chat/${item.id}`);
-    }
+  const handleClick = (item: UnifiedItem) => {
+    if (item.type === "supergroup") router.push(`/chat/supergroup/${item.id}`);
+    else if (item.type === "group") router.push(`/chat/group/${item.id}`);
+    else router.push(`/chat/${item.id}`);
   };
 
   if (loading) {
     return (
-      <div className="p-4 space-y-4">
-        {[1, 2, 3].map((i) => (
+      <div className="p-3 space-y-3 mt-1">
+        {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex items-center gap-3 animate-pulse">
-            <div className="w-10 h-10 bg-secondary rounded-full" />
+            <div className="w-10 h-10 rounded-full shrink-0" style={{ background: "var(--secondary)" }} />
             <div className="flex-1 space-y-2">
-              <div className="h-3 bg-secondary rounded w-1/2" />
-              <div className="h-2 bg-secondary rounded w-3/4" />
+              <div className="h-3 rounded w-2/5" style={{ background: "var(--secondary)" }} />
+              <div className="h-2 rounded w-3/5" style={{ background: "var(--secondary)" }} />
             </div>
           </div>
         ))}
@@ -237,151 +192,126 @@ export const ChatList: React.FC<ChatListProps> = ({ currentUserId }) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-card">
-      {/* Search Area */}
-      <div className="p-3 space-y-2 border-b border-border">
-        <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 group-focus-within:text-primary transition-colors" />
+    <div className="flex flex-col h-full">
+      {/* Search + action buttons */}
+      <div className="p-3 space-y-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
+        {/* Search bar */}
+        <div className="relative">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: "var(--muted-foreground)" }}
+          />
           <input
             type="text"
-            placeholder="Поиск чатов или сообщений..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 bg-secondary text-foreground rounded-xl border border-border focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none text-sm placeholder:text-muted-foreground transition-all"
+            className="w-full pl-8 pr-7 py-2 rounded-full text-sm outline-none"
+            style={{
+              background: "var(--secondary)",
+              color: "var(--foreground)",
+              border: "1px solid var(--border)",
+            }}
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted transition-all"
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--muted-foreground)" }}
             >
-              <X size={14} />
+              <X size={12} />
             </button>
           )}
         </div>
 
+        {/* Pill buttons */}
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowNewChatModal(true)}
-            className="flex-1 px-3 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-bold flex items-center justify-center gap-1.5 text-xs transition-all shadow-lg shadow-primary/20 active:scale-[0.98]"
-          >
-            <UserPlus size={14} />
-            НОВЫЙ ЧАТ
+          <button onClick={() => setShowNewChatModal(true)} className="btn-action btn-chat">
+            <MessageSquarePlus size={13} />
+            + Chat
           </button>
-          <button
-            onClick={() => setShowCreateGroupModal(true)}
-            className="flex-1 px-3 py-2.5 bg-secondary text-foreground rounded-xl hover:bg-secondary/70 font-bold flex items-center justify-center gap-1.5 text-xs transition-all border border-border active:scale-[0.98]"
-          >
-            <Users size={14} />
-            ГРУППА
+          <button onClick={() => setShowCreateGroupModal(true)} className="btn-action btn-group">
+            <Users size={13} />
+            + Group
+          </button>
+          <button onClick={() => setShowCreateSupergroupModal(true)} className="btn-action btn-super">
+            <Globe size={13} />
+            + Super
           </button>
         </div>
-        <button
-          onClick={() => setShowCreateSupergroupModal(true)}
-          className="w-full px-3 py-2.5 bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-foreground rounded-xl hover:from-blue-500/20 hover:to-purple-500/20 font-bold flex items-center justify-center gap-1.5 text-xs transition-all border border-blue-500/20 active:scale-[0.98]"
-        >
-          <Globe size={14} className="text-blue-400" />
-          СУПЕРГРУППА
-        </button>
       </div>
 
       {/* Modals */}
-      {showNewChatModal && (
-        <NewChatModal onClose={() => setShowNewChatModal(false)} />
-      )}
-      {showCreateGroupModal && (
-        <CreateGroupModal onClose={() => setShowCreateGroupModal(false)} />
-      )}
-      {showCreateSupergroupModal && (
-        <CreateSupergroupModal onClose={() => setShowCreateSupergroupModal(false)} />
-      )}
+      {showNewChatModal && <NewChatModal onClose={() => setShowNewChatModal(false)} />}
+      {showCreateGroupModal && <CreateGroupModal onClose={() => setShowCreateGroupModal(false)} />}
+      {showCreateSupergroupModal && <CreateSupergroupModal onClose={() => setShowCreateSupergroupModal(false)} />}
 
-      {/* Unified Chat + Group List */}
+      {/* List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 p-4 text-center">
-            <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center text-muted-foreground mb-3">
-              <MessageSquareOff size={24} />
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 text-center px-4">
+            <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center text-muted-foreground mb-3 border border-border">
+              <MessageSquareOff size={22} />
             </div>
-            <p className="text-sm font-bold">Ничего не найдено</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Попробуйте изменить запрос или <br /> начните новый чат
-            </p>
+            <p className="text-sm font-semibold text-foreground">Nothing here yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Start a new chat above</p>
           </div>
         ) : (
-          filteredItems.map((item) => {
-            const isActive =
-              (item.type === "direct" && params.id === item.id) ||
-              (item.type === "group" && params.id === item.id) ||
-              (item.type === "supergroup" && params.id === item.id);
+          filtered.map((item) => {
+            const activeId = params?.id as string | undefined;
+            const isActive = activeId === item.id;
 
             return (
               <div
                 key={`${item.type}-${item.id}`}
-                onClick={() => handleItemClick(item)}
-                className={`px-4 py-3.5 border-b border-border/50 cursor-pointer transition-all ${
-                  isActive
-                    ? "bg-secondary border-l-4 border-l-primary"
-                    : "border-l-4 border-l-transparent hover:bg-secondary/50"
-                }`}
+                onClick={() => handleClick(item)}
+                className="px-3 py-3 flex items-center gap-3 cursor-pointer transition-colors relative"
+                style={{
+                  borderLeft: isActive
+                    ? "2px solid var(--primary)"
+                    : "2px solid transparent",
+                  background: isActive ? "rgba(6,182,212,0.08)" : "transparent",
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--secondary)"; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
               >
-                <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  {item.type === "supergroup" ? (
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500/80 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-lg shrink-0">
-                      <Globe size={18} />
-                    </div>
-                  ) : item.type === "group" ? (
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center text-primary-foreground font-bold text-sm shadow-lg shrink-0 overflow-hidden">
-                      {item.avatar ? (
-                        <img
-                          src={`${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace("/api", "")}${item.avatar}`}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Hash size={18} />
-                      )}
-                    </div>
-                  ) : (
-                    <UserAvatar
-                      user={{
-                        username: item.name,
-                        avatar: item.avatar,
-                        status: item.status as any,
-                      }}
-                    />
-                  )}
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline mb-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <h3
-                          className={`text-sm font-bold truncate ${
-                            isActive ? "text-primary" : "text-foreground"
-                          }`}
-                        >
-                          {item.name}
-                        </h3>
-                        {(item.type === "group" || item.type === "supergroup") && (
-                          <span className="text-[9px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded-full font-medium shrink-0">
-                            {item.memberCount}
-                          </span>
-                        )}
-                      </div>
-                      {item.lastMessageTime && (
-                        <span className="text-muted-foreground text-[10px] font-medium shrink-0 ml-2">
-                          {formatMessageTime(item.lastMessageTime)}
-                        </span>
-                      )}
-                    </div>
-                    <p
-                      className={`text-xs truncate ${
-                        isActive ? "text-foreground/80" : "text-muted-foreground"
-                      }`}
-                    >
-                      {item.lastMessage || "Нет сообщений"}
-                    </p>
+                {/* Avatar */}
+                {item.type === "supergroup" ? (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shrink-0 shadow-lg">
+                    <Globe size={18} className="text-white" />
                   </div>
+                ) : item.type === "group" ? (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-cyan-700 flex items-center justify-center shrink-0 shadow-md overflow-hidden">
+                    {item.avatar ? (
+                      <img
+                        src={`${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api").replace("/api", "")}${item.avatar}`}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Hash size={18} className="text-white" />
+                    )}
+                  </div>
+                ) : (
+                  <UserAvatar
+                    user={{ username: item.name, avatar: item.avatar, status: item.status as any }}
+                  />
+                )}
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className={`text-sm font-semibold truncate ${isActive ? "text-primary" : "text-foreground"}`}>
+                      {item.name}
+                    </span>
+                    {item.lastMessageTime && (
+                      <span className="text-[10px] text-muted-foreground shrink-0">{fmtTime(item.lastMessageTime)}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {item.lastMessage || (item.type === "direct" ? "No messages yet" : `${item.memberCount} members`)}
+                  </p>
                 </div>
               </div>
             );

@@ -224,6 +224,11 @@ export const api = {
     return data;
   },
 
+  toggleReaction: async (messageId: string, emoji: string) => {
+    const { data } = await apiClient.post(`/messages/${messageId}/reactions`, { emoji });
+    return data;
+  },
+
   uploadFile: async (file: File, onProgress?: (progressEvent: any) => void) => {
     const formData = new FormData();
     formData.append("file", file);

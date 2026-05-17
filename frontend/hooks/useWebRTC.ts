@@ -152,18 +152,40 @@ export const useWebRTC = (socket: Socket | null, currentUserId: string | null) =
   const initiateCall = useCallback(async (receiverId: string, type: "audio" | "video") => {
     if (!socket || statusRef.current !== "idle") return;
 
+    let effectiveType = type;
+    let stream: MediaStream | null = null;
+
+    // Try to get the requested media; fall back to audio-only if camera is unavailable
     try {
-      setCallState((prev) => ({ ...prev, status: "calling", type, remoteUserId: receiverId }));
-      
-      const stream = await getMedia(type);
-      const pc = createPC(receiverId, "temporary"); // We'll update ID after initiate_call
-      
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-      
+      stream = await getMedia(type);
+    } catch (mediaError) {
+      console.error("❌ Failed to get media:", mediaError);
+      if (type === "video") {
+        try {
+          stream = await getMedia("audio");
+          effectiveType = "audio";
+          console.warn("⚠️ Camera unavailable — downgrading video call to audio");
+        } catch (audioError) {
+          console.error("❌ No media devices available:", audioError);
+          resetState();
+          return;
+        }
+      } else {
+        resetState();
+        return;
+      }
+    }
+
+    try {
+      setCallState((prev) => ({ ...prev, status: "calling", type: effectiveType, remoteUserId: receiverId }));
+
+      const pc = createPC(receiverId, "temporary"); // We'll update ID after call_initiated
+      stream!.getTracks().forEach((track) => pc.addTrack(track, stream!));
+
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      socket.emit("initiate_call", { receiverId, type, offer });
+      socket.emit("initiate_call", { receiverId, type: effectiveType, offer });
     } catch (error) {
       console.error("Failed to initiate call:", error);
       resetState();

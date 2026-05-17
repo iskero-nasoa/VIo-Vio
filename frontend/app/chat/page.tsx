@@ -1,15 +1,26 @@
 "use client";
 
-import { MessageSquareDashed } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 export default function ChatEmptyState() {
   return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <div className="w-20 h-20 rounded-2xl bg-white/[0.03] flex items-center justify-center mx-auto">
-          <MessageSquareDashed className="w-10 h-10 text-slate-600" />
-        </div>
-        <p className="text-slate-500 text-sm font-medium">Select a chat to start messaging</p>
+    <div className="flex-1 flex flex-col items-center justify-center gap-5 select-none">
+      {/* Icon bubble */}
+      <div
+        className="w-20 h-20 rounded-2xl flex items-center justify-center"
+        style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}
+      >
+        <MessageSquare
+          size={36}
+          style={{ color: "var(--muted-foreground)", opacity: 0.6 }}
+        />
+      </div>
+
+      <div className="text-center space-y-1.5">
+        <h2 className="text-xl font-bold text-foreground">VioApp Messenger</h2>
+        <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+          Select a conversation to start messaging
+        </p>
       </div>
     </div>
   );

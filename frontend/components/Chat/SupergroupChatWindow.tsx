@@ -6,7 +6,7 @@ import { MessageInput } from "./MessageInput";
 import { TypingIndicator } from "./TypingIndicator";
 import { TopicSidebar } from "./TopicSidebar";
 import { Settings, Hash, Plus, Globe, Loader2 } from "lucide-react";
-import { Message, Topic, Supergroup } from "../../types/chat";
+import { Topic, Supergroup } from "../../types/chat";
 import { api } from "../../utils/api";
 import { useTopicChat } from "../../hooks/useTopicChat";
 import { useAuth } from "../../hooks/useAuth";
@@ -22,7 +22,6 @@ export const SupergroupChatWindow: React.FC<SupergroupChatWindowProps> = ({
 }) => {
   const [supergroup, setSupergroup] = useState<Supergroup | null>(null);
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [loading, setLoading] = useState(true);
   
   const { 
@@ -84,7 +83,6 @@ export const SupergroupChatWindow: React.FC<SupergroupChatWindowProps> = ({
         activeTopicId={activeTopicId}
         onSelectTopic={(id) => {
           setActiveTopicId(id);
-          setReplyTo(null);
         }}
         isAdmin={isAdmin}
         onTopicsChanged={refreshTopics}
@@ -123,7 +121,6 @@ export const SupergroupChatWindow: React.FC<SupergroupChatWindowProps> = ({
                 messages={messages}
                 currentUserId={currentUserId}
                 onDeleteMessage={deleteMessage}
-                onReply={(msg) => setReplyTo(msg)}
               />
             </div>
 
@@ -133,8 +130,6 @@ export const SupergroupChatWindow: React.FC<SupergroupChatWindowProps> = ({
                 onSendMessage={sendMessage}
                 onTyping={emitTyping}
                 disabled={messagesLoading}
-                replyTo={replyTo}
-                onCancelReply={() => setReplyTo(null)}
               />
             </div>
           </>

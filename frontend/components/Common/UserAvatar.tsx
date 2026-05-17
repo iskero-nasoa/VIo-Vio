@@ -41,7 +41,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
   return (
     <div className={`relative shrink-0 ${sizeClasses[size]}`}>
-      <div className={`w-full h-full rounded-2xl flex items-center justify-center font-bold shadow-lg overflow-hidden bg-slate-800 text-slate-300`}>
+      <div className={`w-full h-full rounded-2xl flex items-center justify-center font-bold shadow-lg overflow-hidden bg-secondary text-muted-foreground`}>
         {fullAvatarUrl ? (
           <img src={fullAvatarUrl} alt={user.username} className="w-full h-full object-cover" />
         ) : (
@@ -49,7 +49,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
         )}
       </div>
       {showStatus && user.status && (
-        <div className={`absolute -bottom-0.5 -right-0.5 rounded-full border-slate-950 shadow-sm ${statusClasses[user.status]} ${statusSizeClasses[size]}`}></div>
+        <div className={`absolute -bottom-0.5 -right-0.5 rounded-full border-card shadow-sm ${statusClasses[user.status]} ${statusSizeClasses[size]}`}></div>
       )}
     </div>
   );

@@ -1,40 +1,42 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { Message } from "../../types/chat";
 import { UserAvatar } from "../Common/UserAvatar";
-import { Trash2, MoreVertical, Reply } from "lucide-react";
+import { Trash2, Smile } from "lucide-react";
 import Link from "next/link";
 import { AudioPlayer } from "./AudioPlayer";
+import { ReactionPicker } from "./ReactionPicker";
+import { ReactionBadge } from "./ReactionBadge";
+import { useSocket } from "../../hooks/useSocket";
 
 interface MessageListProps {
   messages: Message[];
   currentUserId: string;
   onDeleteMessage: (messageId: string) => void;
-  onReply?: (message: Message) => void;
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ 
-  messages, 
-  currentUserId, 
+export const MessageList: React.FC<MessageListProps> = ({
+  messages,
+  currentUserId,
   onDeleteMessage,
-  onReply
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
+  const { socket } = useSocket();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const scrollToOriginal = (messageId: string) => {
-    const element = document.getElementById(`msg-${messageId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
-      element.classList.add("bg-primary/10");
-      setTimeout(() => element.classList.remove("bg-primary/10"), 2000);
-    }
-  };
+  const handleToggleReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      if (!socket) return;
+      socket.emit("toggle_reaction", { messageId, emoji, userId: currentUserId });
+    },
+    [socket, currentUserId]
+  );
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
@@ -50,6 +52,8 @@ export const MessageList: React.FC<MessageListProps> = ({
           const senderUsername = msg.senderUsername || (typeof msg.senderId !== "string" ? (msg.senderId as any).username : "?");
           const senderAvatar = msg.senderAvatar || (typeof msg.senderId !== "string" ? (msg.senderId as any).avatar : undefined);
 
+          const hasReactions = msg.reactions && msg.reactions.length > 0;
+
           return (
             <div
               key={msg._id}
@@ -58,17 +62,28 @@ export const MessageList: React.FC<MessageListProps> = ({
             >
               {/* Message Actions (Visible on hover) */}
               <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all self-center shrink-0 ${isMe ? 'flex-row' : 'flex-row-reverse'}`}>
-                {/* Reply Button */}
-                <button 
-                  onClick={() => onReply?.(msg)}
-                  className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
-                  title="Ответить"
-                >
-                  <Reply size={16} />
-                </button>
+                {/* Reaction trigger */}
+                <div className="relative">
+                  <button
+                    onClick={() =>
+                      setPickerOpenFor(pickerOpenFor === msg._id ? null : msg._id)
+                    }
+                    className="p-2 text-muted-foreground hover:text-yellow-400 hover:bg-yellow-400/10 rounded-xl transition-all"
+                    title="Add reaction"
+                  >
+                    <Smile size={16} />
+                  </button>
+                  {pickerOpenFor === msg._id && (
+                    <ReactionPicker
+                      isMe={isMe}
+                      onSelect={(emoji) => handleToggleReaction(msg._id, emoji)}
+                      onClose={() => setPickerOpenFor(null)}
+                    />
+                  )}
+                </div>
 
                 {/* Delete Button */}
-                <button 
+                <button
                   onClick={() => {
                     if (window.confirm("Удалить сообщение для себя?")) {
                       onDeleteMessage(msg._id);
@@ -104,23 +119,6 @@ export const MessageList: React.FC<MessageListProps> = ({
                     : 'bg-secondary text-foreground rounded-tl-none border border-border/50'
                     }`}
                 >
-                  {/* Reply Quote */}
-                  {msg.replyTo && (
-                    <div 
-                      onClick={() => scrollToOriginal(msg.replyTo!._id)}
-                      className={`mb-2 p-2 rounded-lg text-xs border-l-2 flex flex-col gap-1 cursor-pointer hover:opacity-80 transition-opacity ${
-                        isMe ? 'bg-black/10 border-white/50' : 'bg-primary/5 border-primary/50'
-                      }`}
-                    >
-                      <p className={`font-bold ${isMe ? 'text-white/90' : 'text-primary'}`}>
-                        {typeof msg.replyTo.senderId === 'string' ? '...' : (msg.replyTo.senderId as any).username}
-                      </p>
-                      <p className="opacity-80 truncate max-w-[200px]">
-                        {msg.replyTo.text || "Вложение"}
-                      </p>
-                    </div>
-                  )}
-
                   {/* Attachments support */}
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="mb-2 space-y-2">
@@ -153,12 +151,36 @@ export const MessageList: React.FC<MessageListProps> = ({
                     {format(new Date(msg.createdAt), "HH:mm")}
                   </div>
                 </div>
+
+                {/* Reaction badges — below bubble */}
+                {hasReactions && (
+                  <div
+                    className={`flex flex-wrap gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}
+                    style={{ animation: "reactionBadgeIn 0.2s ease-out" }}
+                  >
+                    {msg.reactions!.map((r) => (
+                      <ReactionBadge
+                        key={r.emoji}
+                        reaction={r}
+                        currentUserId={currentUserId}
+                        onToggle={(emoji) => handleToggleReaction(msg._id, emoji)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
         })
       )}
       <div ref={bottomRef} />
+
+      <style>{`
+        @keyframes reactionBadgeIn {
+          from { opacity: 0; transform: scale(0.7); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 };

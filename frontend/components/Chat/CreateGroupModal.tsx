@@ -19,6 +19,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) =
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -50,6 +51,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) =
   const handleCreate = async () => {
     if (!groupName.trim() || selectedUserIds.size === 0) return;
     setCreating(true);
+    setError(null);
     try {
       const group = await api.createGroup(
         groupName.trim(),
@@ -58,9 +60,9 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) =
       );
       router.push(`/chat/group/${group._id}`);
       onClose();
-    } catch (error) {
-      console.error("Failed to create group", error);
-      alert("Не удалось создать группу");
+    } catch (err: any) {
+      console.error("Failed to create group", err);
+      setError(err.message || "Failed to create group. Try again.");
     } finally {
       setCreating(false);
     }
@@ -239,7 +241,12 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose }) =
             </div>
 
             {/* Create Button */}
-            <div className="p-4 border-t border-border">
+            <div className="p-4 border-t border-border space-y-2">
+              {error && (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+                  {error}
+                </p>
+              )}
               <button
                 onClick={handleCreate}
                 disabled={selectedUserIds.size === 0 || creating}

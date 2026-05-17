@@ -8,7 +8,6 @@ import { useGroupChat } from "../../hooks/useGroupChat";
 import { useTopicChat } from "../../hooks/useTopicChat";
 import { Settings, Users, Hash, ChevronRight, ChevronLeft } from "lucide-react";
 import { UserAvatar } from "../Common/UserAvatar";
-import { Message } from "../../types/chat";
 import { GroupSettingsModal } from "./GroupSettingsModal";
 import { TopicSidebar } from "./TopicSidebar";
 
@@ -29,7 +28,6 @@ export const GroupChatWindow: React.FC<GroupChatWindowProps> = ({ groupId, curre
     refreshGroup,
   } = useGroupChat(groupId);
 
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
   const [showTopics, setShowTopics] = useState(true);
@@ -78,7 +76,6 @@ export const GroupChatWindow: React.FC<GroupChatWindowProps> = ({ groupId, curre
           activeTopicId={activeTopicId}
           onSelectTopic={(id) => {
             setActiveTopicId(id);
-            setReplyTo(null);
           }}
           isAdmin={isAdmin}
           onTopicsChanged={refreshTopics}
@@ -150,7 +147,6 @@ export const GroupChatWindow: React.FC<GroupChatWindowProps> = ({ groupId, curre
             messages={messages}
             currentUserId={currentUserId}
             onDeleteMessage={deleteMessage}
-            onReply={(msg) => setReplyTo(msg)}
           />
         </div>
 
@@ -161,8 +157,6 @@ export const GroupChatWindow: React.FC<GroupChatWindowProps> = ({ groupId, curre
             onSendMessage={sendMessage}
             onTyping={emitTyping}
             disabled={loading}
-            replyTo={replyTo}
-            onCancelReply={() => setReplyTo(null)}
           />
         </div>
 

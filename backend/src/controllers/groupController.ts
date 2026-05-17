@@ -1,331 +1,310 @@
 import { Request, Response } from "express";
-import Group from "../models/Group";
-import Message from "../models/Message";
-import DeletedMessage from "../models/DeletedMessage";
-import mongoose from "mongoose";
+import { prisma } from "../config/prisma";
 import { getIO } from "../config/socket";
 
-// Create a new group
+const groupInclude = {
+  admin: { select: { id: true, username: true, avatar: true, email: true } },
+  members: {
+    include: {
+      user: { select: { id: true, username: true, avatar: true, email: true, status: true } },
+    },
+  },
+  messages: {
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+    include: { sender: { select: { id: true, username: true, avatar: true } } },
+  },
+};
+
+function formatGroup(g: any) {
+  return {
+    _id: g.id,
+    id: g.id,
+    name: g.name,
+    description: g.description,
+    avatar: g.avatar,
+    createdAt: g.createdAt,
+    updatedAt: g.updatedAt,
+    admin: { _id: g.admin.id, ...g.admin },
+    members: g.members.map((m: any) => ({ _id: m.user.id, ...m.user })),
+    messages: (g.messages || []).map((m: any) => ({
+      _id: m.id,
+      text: m.text,
+      createdAt: m.createdAt,
+      senderUsername: m.sender?.username,
+      senderId: m.sender ? { _id: m.sender.id, ...m.sender } : m.senderId,
+    })),
+  };
+}
+
 export const createGroup = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user?._id;
-    if (!userId) {
-      res.status(401).json({ message: "Unauthorized" });
-      return;
-    }
+    const userId = req.user?.id as string;
+    const { name, description } = req.body;
+    // Accept both "memberIds" and "members" keys from the frontend
+    const memberIds: string[] = req.body.memberIds || req.body.members || [];
 
-    const { name, description, memberIds } = req.body;
-
-    if (!name || !name.trim()) {
+    if (!name?.trim()) {
       res.status(400).json({ message: "Group name is required" });
       return;
     }
 
-    if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
+    if (!Array.isArray(memberIds) || memberIds.length === 0) {
       res.status(400).json({ message: "At least one member is required" });
       return;
     }
 
-    // Ensure admin is included in members
-    const allMembers = Array.from(new Set([userId.toString(), ...memberIds]));
+    const allMemberIds = Array.from(new Set([userId, ...memberIds])) as string[];
 
-    const group = await Group.create({
-      name: name.trim(),
-      description: description?.trim() || "",
-      admin: userId,
-      members: allMembers.map((id) => new mongoose.Types.ObjectId(id)),
-      messages: [],
+    const group = await prisma.group.create({
+      data: {
+        name: name.trim(),
+        description: description?.trim() || "",
+        adminId: userId,
+        members: { create: allMemberIds.map((uid) => ({ userId: uid })) },
+      },
+      include: groupInclude,
     });
 
-    const populated = await group.populate([
-      { path: "admin", select: "username avatar email" },
-      { path: "members", select: "username avatar email status" },
-    ]);
-
-    // Notify all members via socket
+    const formatted = formatGroup(group);
     const io = getIO();
-    allMembers.forEach((memberId) => {
-      io.to(`user_${memberId}`).emit("group_created", populated);
-    });
+    allMemberIds.forEach((uid) => io.to(`user_${uid}`).emit("group_created", formatted));
 
-    res.status(201).json(populated);
+    res.status(201).json(formatted);
   } catch (error) {
     res.status(500).json({ message: "Failed to create group", error });
   }
 };
 
-// Get all groups the current user is a member of
 export const getGroups = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user?._id;
-
-    const groups = await Group.find({ members: userId })
-      .populate("admin", "username avatar email")
-      .populate("members", "username avatar email status")
-      .populate({
-        path: "messages",
-        options: { sort: { createdAt: -1 }, limit: 1 },
-        populate: { path: "senderId", select: "username avatar" },
-      })
-      .sort({ updatedAt: -1 });
-
-    res.status(200).json(groups);
+    const userId = req.user?.id;
+    const groups = await prisma.group.findMany({
+      where: { members: { some: { userId } } },
+      include: groupInclude,
+      orderBy: { updatedAt: "desc" },
+    });
+    res.status(200).json(groups.map(formatGroup));
   } catch (error) {
     res.status(500).json({ message: "Failed to get groups", error });
   }
 };
 
-// Get a single group by ID
 export const getGroup = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId } = req.params;
-
-    const group = await Group.findById(groupId)
-      .populate("admin", "username avatar email")
-      .populate("members", "username avatar email status");
-
+    const groupId = req.params.groupId as string;
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      include: groupInclude,
+    });
     if (!group) {
       res.status(404).json({ message: "Group not found" });
       return;
     }
-
-    res.status(200).json(group);
+    res.status(200).json(formatGroup(group));
   } catch (error) {
     res.status(500).json({ message: "Failed to get group", error });
   }
 };
 
-// Get messages for a group (paginated)
 export const getGroupMessages = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId } = req.params;
-    const userId = req.user?._id;
+    const groupId = req.params.groupId as string;
+    const userId = req.user?.id as string;
     const skip = parseInt(req.query.skip as string) || 0;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    // Filter out messages deleted by this user
-    const deletedForMe = await DeletedMessage.find({ userId }).distinct("messageId");
+    const deletedForMe = await prisma.deletedMessage.findMany({
+      where: { userId },
+      select: { messageId: true },
+    });
+    const deletedIds = deletedForMe.map((d) => d.messageId);
 
-    const messages = await Message.find({
-      chatId: new mongoose.Types.ObjectId(groupId as string),
-      _id: { $nin: deletedForMe },
-    })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate([
-        { path: "senderId", select: "username avatar" },
-        {
-          path: "replyTo",
-          populate: { path: "senderId", select: "username" },
-        },
-      ]);
+    const messages = await prisma.message.findMany({
+      where: { groupId, id: { notIn: deletedIds } },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      include: {
+        sender: { select: { id: true, username: true, avatar: true } },
+        replyTo: { include: { sender: { select: { id: true, username: true } } } },
+      },
+    });
 
-    res.status(200).json(messages.reverse());
+    res.status(200).json(
+      messages.reverse().map((m) => ({
+        _id: m.id,
+        id: m.id,
+        groupId: m.groupId,
+        text: m.text,
+        attachments: JSON.parse(m.attachments || "[]"),
+        createdAt: m.createdAt,
+        senderId: m.sender ? { _id: m.sender.id, ...m.sender } : m.senderId,
+        senderUsername: m.sender?.username,
+        senderAvatar: m.sender?.avatar,
+        replyTo: m.replyTo
+          ? { _id: m.replyTo.id, text: m.replyTo.text, senderId: m.replyTo.sender }
+          : null,
+      }))
+    );
   } catch (error) {
     res.status(500).json({ message: "Failed to get group messages", error });
   }
 };
 
-// Update group (admin only)
 export const updateGroup = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId } = req.params;
-    const userId = req.user?._id;
+    const groupId = req.params.groupId as string;
+    const userId = req.user?.id as string;
     const { name, description, avatar } = req.body;
 
-    const group = await Group.findById(groupId);
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
     if (!group) {
       res.status(404).json({ message: "Group not found" });
       return;
     }
 
-    if (group.admin.toString() !== userId?.toString()) {
+    if (group.adminId !== userId) {
       res.status(403).json({ message: "Only admin can update the group" });
       return;
     }
 
-    if (name !== undefined) group.name = name.trim();
-    if (description !== undefined) group.description = description.trim();
-    if (avatar !== undefined) group.avatar = avatar;
+    const updated = await prisma.group.update({
+      where: { id: groupId },
+      data: {
+        ...(name !== undefined && { name: name.trim() }),
+        ...(description !== undefined && { description: description.trim() }),
+        ...(avatar !== undefined && { avatar }),
+      },
+      include: groupInclude,
+    });
 
-    await group.save();
-
-    const populated = await group.populate([
-      { path: "admin", select: "username avatar email" },
-      { path: "members", select: "username avatar email status" },
-    ]);
-
-    // Notify all members
-    const io = getIO();
-    io.to(`group_${groupId}`).emit("group_updated", populated);
-
-    res.status(200).json(populated);
+    const formatted = formatGroup(updated);
+    getIO().to(`group_${groupId}`).emit("group_updated", formatted);
+    res.status(200).json(formatted);
   } catch (error) {
     res.status(500).json({ message: "Failed to update group", error });
   }
 };
 
-// Delete group (admin only)
 export const deleteGroup = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId } = req.params;
-    const userId = req.user?._id;
+    const groupId = req.params.groupId as string;
+    const userId = req.user?.id as string;
 
-    const group = await Group.findById(groupId);
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
     if (!group) {
       res.status(404).json({ message: "Group not found" });
       return;
     }
 
-    if (group.admin.toString() !== userId?.toString()) {
+    if (group.adminId !== userId) {
       res.status(403).json({ message: "Only admin can delete the group" });
       return;
     }
 
-    // Delete all messages in the group
-    await Message.deleteMany({ chatId: new mongoose.Types.ObjectId(groupId as string) });
-
-    // Notify members before deletion
-    const io = getIO();
-    io.to(`group_${groupId}`).emit("group_deleted", { groupId });
-
-    await Group.findByIdAndDelete(groupId);
-
+    getIO().to(`group_${groupId}`).emit("group_deleted", { groupId });
+    await prisma.group.delete({ where: { id: groupId } });
     res.status(200).json({ message: "Group deleted" });
   } catch (error) {
     res.status(500).json({ message: "Failed to delete group", error });
   }
 };
 
-// Add a member to the group (admin only)
 export const addMember = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId } = req.params;
+    const groupId = req.params.groupId as string;
     const { userId: newMemberId } = req.body;
-    const adminId = req.user?._id;
+    const adminId = req.user?.id as string;
 
-    const group = await Group.findById(groupId);
+    const group = await prisma.group.findUnique({ where: { id: groupId }, include: { members: true } });
     if (!group) {
       res.status(404).json({ message: "Group not found" });
       return;
     }
 
-    if (group.admin.toString() !== adminId?.toString()) {
+    if (group.adminId !== adminId) {
       res.status(403).json({ message: "Only admin can add members" });
       return;
     }
 
-    if (!newMemberId) {
-      res.status(400).json({ message: "User ID is required" });
-      return;
-    }
-
-    // Check if already a member
-    if (group.members.some((m) => m.toString() === newMemberId)) {
+    if (group.members.some((m) => m.userId === newMemberId)) {
       res.status(400).json({ message: "User is already a member" });
       return;
     }
 
-    group.members.push(new mongoose.Types.ObjectId(newMemberId));
-    await group.save();
-
-    const populated = await group.populate([
-      { path: "admin", select: "username avatar email" },
-      { path: "members", select: "username avatar email status" },
-    ]);
-
-    // Notify group and the new member
-    const io = getIO();
-    io.to(`group_${groupId}`).emit("group_member_added", {
-      groupId,
-      group: populated,
+    const updated = await prisma.group.update({
+      where: { id: groupId },
+      data: { members: { create: { userId: newMemberId } } },
+      include: groupInclude,
     });
-    io.to(`user_${newMemberId}`).emit("group_created", populated);
 
-    res.status(200).json(populated);
+    const formatted = formatGroup(updated);
+    const io = getIO();
+    io.to(`group_${groupId}`).emit("group_member_added", { groupId, group: formatted });
+    io.to(`user_${newMemberId}`).emit("group_created", formatted);
+    res.status(200).json(formatted);
   } catch (error) {
     res.status(500).json({ message: "Failed to add member", error });
   }
 };
 
-// Remove a member from the group (admin only)
 export const removeMember = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId, memberId } = req.params;
-    const adminId = req.user?._id;
+    const groupId = req.params.groupId as string;
+    const memberId = req.params.memberId as string;
+    const adminId = req.user?.id as string;
 
-    const group = await Group.findById(groupId);
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
     if (!group) {
       res.status(404).json({ message: "Group not found" });
       return;
     }
 
-    if (group.admin.toString() !== adminId?.toString()) {
+    if (group.adminId !== adminId) {
       res.status(403).json({ message: "Only admin can remove members" });
       return;
     }
 
-    if (memberId === group.admin.toString()) {
+    if (memberId === group.adminId) {
       res.status(400).json({ message: "Cannot remove the admin" });
       return;
     }
 
-    group.members = group.members.filter((m) => m.toString() !== memberId);
-    await group.save();
+    await prisma.groupMember.delete({ where: { groupId_userId: { groupId, userId: memberId } } });
 
-    const populated = await group.populate([
-      { path: "admin", select: "username avatar email" },
-      { path: "members", select: "username avatar email status" },
-    ]);
-
-    // Notify group and the removed member
+    const updated = await prisma.group.findUnique({ where: { id: groupId }, include: groupInclude });
+    const formatted = formatGroup(updated!);
     const io = getIO();
-    io.to(`group_${groupId}`).emit("group_member_removed", {
-      groupId,
-      memberId,
-      group: populated,
-    });
+    io.to(`group_${groupId}`).emit("group_member_removed", { groupId, memberId, group: formatted });
     io.to(`user_${memberId}`).emit("group_removed", { groupId });
-
-    res.status(200).json(populated);
+    res.status(200).json(formatted);
   } catch (error) {
     res.status(500).json({ message: "Failed to remove member", error });
   }
 };
 
-// Leave group (non-admin)
 export const leaveGroup = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId } = req.params;
-    const userId = req.user?._id;
+    const groupId = req.params.groupId as string;
+    const userId = req.user?.id as string;
 
-    const group = await Group.findById(groupId);
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
     if (!group) {
       res.status(404).json({ message: "Group not found" });
       return;
     }
 
-    if (group.admin.toString() === userId?.toString()) {
-      res.status(400).json({ message: "Admin cannot leave the group. Transfer admin or delete the group." });
+    if (group.adminId === userId) {
+      res.status(400).json({ message: "Admin cannot leave. Transfer admin or delete the group." });
       return;
     }
 
-    group.members = group.members.filter((m) => m.toString() !== userId?.toString());
-    await group.save();
+    await prisma.groupMember.delete({ where: { groupId_userId: { groupId, userId } } });
 
-    const populated = await group.populate([
-      { path: "admin", select: "username avatar email" },
-      { path: "members", select: "username avatar email status" },
-    ]);
-
-    const io = getIO();
-    io.to(`group_${groupId}`).emit("group_member_removed", {
-      groupId,
-      memberId: userId?.toString(),
-      group: populated,
-    });
-
+    const updated = await prisma.group.findUnique({ where: { id: groupId }, include: groupInclude });
+    const formatted = formatGroup(updated!);
+    getIO().to(`group_${groupId}`).emit("group_member_removed", { groupId, memberId: userId, group: formatted });
     res.status(200).json({ message: "Left the group" });
   } catch (error) {
     res.status(500).json({ message: "Failed to leave group", error });

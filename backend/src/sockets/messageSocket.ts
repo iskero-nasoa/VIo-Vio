@@ -1,64 +1,103 @@
 import { Server, Socket } from "socket.io";
+import { prisma } from "../config/prisma";
 import { sendMessage } from "../controllers/messageController";
-import User from "../models/User";
+
+function groupReactions(reactions: { id: string; userId: string; emoji: string }[]) {
+  const grouped: Record<string, { emoji: string; count: number; userIds: string[] }> = {};
+  for (const r of reactions) {
+    if (!grouped[r.emoji]) grouped[r.emoji] = { emoji: r.emoji, count: 0, userIds: [] };
+    grouped[r.emoji].count++;
+    grouped[r.emoji].userIds.push(r.userId);
+  }
+  return Object.values(grouped);
+}
 
 interface SocketWithUser extends Socket {
   userId?: string;
 }
 
 export const setupMessageSocket = (io: Server, socket: SocketWithUser) => {
-  socket.on("join_chat", async (data: { chatId: string; userId: string }) => {
+  socket.on("join_chat", (data: { chatId: string; userId: string }) => {
     socket.join(data.chatId);
-    console.log(`🔌 Socket ${socket.id} joined chat: ${data.chatId}`);
-    
-    // Fetch user info
-    const user = await User.findById(data.userId).select("username");
-    if (user) {
-      socket.to(data.chatId).emit("user_joined", { userId: data.userId, username: user.username });
-    }
   });
 
   socket.on(
     "send_message",
-    async (data: { chatId: string; senderId: string; text: string; attachments?: any[]; replyTo?: string; tempId?: string }) => {
+    async (data: {
+      chatId: string;
+      senderId: string;
+      text: string;
+      attachments?: any[];
+      replyTo?: string;
+      tempId?: string;
+    }) => {
       try {
-        // Save message using controller
         const message = await sendMessage(data.chatId, data.text, data.senderId, data.attachments, data.replyTo);
-
-        // Broadcast to room
-        io.to(data.chatId).emit("message_received", {
-          _id: message._id,
-          chatId: message.chatId,
-          senderId: message.senderId,
-          text: message.text,
-          attachments: message.attachments,
-          replyTo: message.replyTo,
-          createdAt: message.createdAt,
-          senderUsername: (message.senderId as any).username,
-          senderAvatar: (message.senderId as any).avatar,
-          tempId: data.tempId // Send back the tempId to the sender
-        });
+        io.to(data.chatId).emit("message_received", { ...message, tempId: data.tempId });
       } catch (error) {
-        console.error("Error saving/sending message via socket:", error);
+        console.error("Error saving message via socket:", error);
       }
     }
   );
 
   socket.on("typing", async (data: { chatId: string; userId: string; isTyping: boolean }) => {
-    const user = await User.findById(data.userId).select("username");
+    const user = await prisma.user.findUnique({
+      where: { id: data.userId },
+      select: { username: true },
+    });
     if (user) {
-      socket.to(data.chatId).emit("user_typing", { 
-        userId: data.userId, 
+      socket.to(data.chatId).emit("user_typing", {
+        userId: data.userId,
         username: user.username,
-        isTyping: data.isTyping 
+        isTyping: data.isTyping,
       });
     }
   });
-  
+
   socket.on("leave_chat", (chatId: string) => {
     socket.leave(chatId);
     if (socket.userId) {
-       socket.to(chatId).emit("user_left", { userId: socket.userId });
+      socket.to(chatId).emit("user_left", { userId: socket.userId });
     }
   });
+
+  socket.on(
+    "toggle_reaction",
+    async (data: { messageId: string; emoji: string; userId: string }) => {
+      try {
+        const message = await prisma.message.findUnique({ where: { id: data.messageId } });
+        if (!message) return;
+
+        const existing = await prisma.reaction.findUnique({
+          where: { messageId_userId: { messageId: data.messageId, userId: data.userId } },
+        });
+
+        if (existing) {
+          if (existing.emoji === data.emoji) {
+            await prisma.reaction.delete({ where: { messageId_userId: { messageId: data.messageId, userId: data.userId } } });
+          } else {
+            await prisma.reaction.update({
+              where: { messageId_userId: { messageId: data.messageId, userId: data.userId } },
+              data: { emoji: data.emoji },
+            });
+          }
+        } else {
+          await prisma.reaction.create({ data: { messageId: data.messageId, userId: data.userId, emoji: data.emoji } });
+        }
+
+        const reactions = await prisma.reaction.findMany({
+          where: { messageId: data.messageId },
+          select: { id: true, userId: true, emoji: true },
+        });
+
+        const grouped = groupReactions(reactions);
+        const room = message.chatId || (message.groupId ? `group_${message.groupId}` : message.topicId ? `topic_${message.topicId}` : null);
+        if (room) {
+          io.to(room).emit("reaction_updated", { messageId: data.messageId, reactions: grouped });
+        }
+      } catch (error) {
+        console.error("Error toggling reaction:", error);
+      }
+    }
+  );
 };

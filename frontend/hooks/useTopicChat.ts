@@ -164,7 +164,7 @@ export const useTopicChat = (groupId: string | null, topicId: string | null) => 
   }, [socket, connected, topicId, groupId, user]);
 
   const sendMessage = useCallback(
-    async (text: string, attachments?: any[], replyToId?: string) => {
+    async (text: string, attachments?: any[]) => {
       if (!groupId || !topicId || !socket || !user) return;
       if (!text.trim() && (!attachments || attachments.length === 0)) return;
 
@@ -191,7 +191,6 @@ export const useTopicChat = (groupId: string | null, topicId: string | null) => 
           text,
           senderId: user.id,
           attachments,
-          replyTo: replyToId,
           tempId,
         });
 

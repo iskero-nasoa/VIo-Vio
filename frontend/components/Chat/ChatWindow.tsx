@@ -6,10 +6,9 @@ import { MessageInput } from "./MessageInput";
 import { TypingIndicator } from "./TypingIndicator";
 import { useChat } from "../../hooks/useChat";
 import { useCall } from "../../context/CallContext";
-import { Search, Phone, Video, Info } from "lucide-react";
+import { Phone, Video, Info } from "lucide-react";
 import { UserAvatar } from "../Common/UserAvatar";
 import Link from "next/link";
-import { Message } from "../../types/chat";
 
 interface ChatWindowProps {
   chatId: string;
@@ -20,69 +19,60 @@ interface ChatWindowProps {
 export const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, currentUserId, recipient }) => {
   const { messages, loading, sendMessage, emitTyping, typingUsers, deleteMessage } = useChat(chatId);
   const { initiateCall } = useCall();
-  const [replyTo, setReplyTo] = React.useState<Message | null>(null);
 
   return (
-    <div className="flex-1 flex flex-col bg-background h-full">
-      {/* Chat Header */}
-      <div className="p-4 border-b border-border bg-card flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <Link href={`/profile/${recipient?._id || ""}`} className="hover:opacity-80 transition-opacity">
-            <UserAvatar user={recipient} />
-          </Link>
+    <div className="flex-1 flex flex-col h-full bg-background">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between z-10 shadow-sm">
+        <Link href={`/profile/${recipient?._id || recipient?.id || ""}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <UserAvatar user={recipient} />
           <div>
-            <h2 className="text-foreground font-medium leading-none mb-1">
+            <h2 className="text-sm font-semibold text-foreground leading-none mb-1">
               {recipient?.username || "Chat"}
             </h2>
-            <p className="text-muted-foreground text-xs">
-              {recipient?.status === 'online' ? 'Online' : 'Offline'}
+            <p className={`text-xs font-medium ${recipient?.status === "online" ? "text-emerald-400" : "text-muted-foreground"}`}>
+              {recipient?.status === "online" ? "● Online" : "● Offline"}
             </p>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-3 md:gap-5 text-muted-foreground">
-          <button className="hover:text-foreground transition-colors p-1">
-            <Search size={20} />
-          </button>
-          <button 
+        </Link>
+
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <button
             onClick={() => recipient?._id && initiateCall(recipient._id, "audio")}
-            className="hover:text-foreground transition-colors p-1"
-            title="Голосовой звонок"
+            className="p-2 hover:text-primary hover:bg-primary/10 rounded-xl transition-colors"
+            title="Voice call"
           >
-            <Phone size={20} />
+            <Phone size={18} />
           </button>
-          <button 
+          <button
             onClick={() => recipient?._id && initiateCall(recipient._id, "video")}
-            className="hover:text-foreground transition-colors p-1"
-            title="Видеозвонок"
+            className="p-2 hover:text-primary hover:bg-primary/10 rounded-xl transition-colors"
+            title="Video call"
           >
-            <Video size={20} />
+            <Video size={18} />
           </button>
-          <button className="hover:text-foreground transition-colors p-1">
-            <Info size={20} />
+          <button className="p-2 hover:text-foreground hover:bg-secondary rounded-xl transition-colors">
+            <Info size={18} />
           </button>
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-hidden flex flex-col relative">
-        <MessageList 
-          messages={messages} 
-          currentUserId={currentUserId} 
-          onDeleteMessage={deleteMessage} 
-          onReply={(msg) => setReplyTo(msg)}
+      {/* Messages */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <MessageList
+          messages={messages}
+          currentUserId={currentUserId}
+          onDeleteMessage={deleteMessage}
         />
       </div>
 
-      {/* Message Input */}
-      <div className="p-4 border-t border-border bg-card">
+      {/* Input */}
+      <div className="px-4 py-3 border-t border-border bg-card">
         <TypingIndicator users={Array.from(typingUsers)} />
-        <MessageInput 
-          onSendMessage={sendMessage} 
-          onTyping={emitTyping} 
-          disabled={loading} 
-          replyTo={replyTo}
-          onCancelReply={() => setReplyTo(null)}
+        <MessageInput
+          onSendMessage={sendMessage}
+          onTyping={emitTyping}
+          disabled={loading}
         />
       </div>
     </div>

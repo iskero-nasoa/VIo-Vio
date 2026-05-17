@@ -1,44 +1,35 @@
 import { Server, Socket } from "socket.io";
-import User from "../models/User";
+import { prisma } from "../config/prisma";
 
 export const setupPresenceSocket = (io: Server, socket: Socket) => {
-  const userId = (socket as any).userId;
+  const userId = (socket as any).userId as string | undefined;
 
-  if (userId) {
-    // Set user to online on connect
-    const setOnline = async () => {
-      await User.findByIdAndUpdate(userId, { status: "online" });
-      io.emit("user_status_changed", { userId, status: "online" });
-      // Join personal room automatically
-      socket.join(`user_${userId}`);
-    };
-    setOnline();
+  if (!userId) return;
 
-    socket.on("join_user_room", (targetUserId: string) => {
-      socket.join(`user_${targetUserId}`);
+  const setStatus = async (status: string, statusText?: string) => {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { status, ...(statusText !== undefined && { statusText }) },
     });
+    io.emit("user_status_changed", { userId, status, statusText });
+  };
 
-    socket.on("join_supergroup", (supergroupId: string) => {
-      socket.join(`supergroup_${supergroupId}`);
-      console.log(`🔌 Socket ${socket.id} joined supergroup: ${supergroupId}`);
-    });
+  setStatus("online");
+  socket.join(`user_${userId}`);
 
-    socket.on("disconnect", async () => {
-      // Set user to offline on disconnect
-      await User.findByIdAndUpdate(userId, { status: "offline" });
-      io.emit("user_status_changed", { userId, status: "offline" });
-    });
+  socket.on("join_user_room", (targetUserId: string) => {
+    socket.join(`user_${targetUserId}`);
+  });
 
-    socket.on("change_status", async (data: { status: "online" | "away" | "offline"; statusText?: string }) => {
-      await User.findByIdAndUpdate(userId, {
-        status: data.status,
-        statusText: data.statusText || ""
-      });
-      io.emit("user_status_changed", {
-        userId,
-        status: data.status,
-        statusText: data.statusText
-      });
-    });
-  }
+  socket.on("join_supergroup", (supergroupId: string) => {
+    socket.join(`supergroup_${supergroupId}`);
+  });
+
+  socket.on("change_status", (data: { status: "online" | "away" | "offline"; statusText?: string }) => {
+    setStatus(data.status, data.statusText || "");
+  });
+
+  socket.on("disconnect", () => {
+    setStatus("offline");
+  });
 };

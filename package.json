@@ -1,13 +1,18 @@
 {
-  "name": "isko-gram",
+  "name": "vioapp",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npm run dev --prefix frontend & npm run dev --prefix backend",
-    "install:all": "npm install --prefix frontend && npm install --prefix backend",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\" --names \"backend,frontend\" --prefix-colors \"cyan,magenta\"",
+    "install:all": "npm install && npm install --prefix frontend && npm install --prefix backend",
     "build:frontend": "npm run build --prefix frontend",
     "build:backend": "npm run build --prefix backend",
     "start:frontend": "npm run start --prefix frontend",
-    "start:backend": "npm run start --prefix backend"
+    "start:backend": "npm run start --prefix backend",
+    "db:push": "npm run prisma:push --prefix backend",
+    "db:studio": "npx prisma studio --schema=backend/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
   }
 }

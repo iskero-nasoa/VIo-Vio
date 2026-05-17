@@ -15,6 +15,12 @@ backend/build/
 backend/node_modules/
 backend/uploads/
 
+# SQLite database
+backend/prisma/*.db
+backend/prisma/*.db-journal
+backend/prisma/*.db-wal
+backend/prisma/*.db-shm
+
 # production
 /build
 
@@ -28,8 +34,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env*
+# env files (keep .env.example and .env.local.example committed)
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env.local
 
 # vercel
 .vercel
