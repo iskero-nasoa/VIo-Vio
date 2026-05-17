@@ -129,6 +129,10 @@ export const useTopicChat = (groupId: string | null, topicId: string | null) => 
       });
     };
 
+    const handleMessageDeleted = (deletedMessageId: string) => {
+      setMessages((prev) => prev.filter((m) => m._id !== deletedMessageId));
+    };
+
     const handleTopicCreated = (data: { groupId: string; topic: Topic }) => {
       if (data.groupId === groupId) {
         setTopics((prev) => [...prev, data.topic]);
@@ -149,6 +153,7 @@ export const useTopicChat = (groupId: string | null, topicId: string | null) => 
 
     socket.on("topic_message_received", handleMessage);
     socket.on("topic_user_typing", handleTyping);
+    socket.on("message_deleted", handleMessageDeleted);
     socket.on("topic_created", handleTopicCreated);
     socket.on("topic_updated", handleTopicUpdated);
     socket.on("topic_deleted", handleTopicDeleted);
@@ -156,6 +161,7 @@ export const useTopicChat = (groupId: string | null, topicId: string | null) => 
     return () => {
       socket.off("topic_message_received", handleMessage);
       socket.off("topic_user_typing", handleTyping);
+      socket.off("message_deleted", handleMessageDeleted);
       socket.off("topic_created", handleTopicCreated);
       socket.off("topic_updated", handleTopicUpdated);
       socket.off("topic_deleted", handleTopicDeleted);
@@ -216,12 +222,21 @@ export const useTopicChat = (groupId: string | null, topicId: string | null) => 
     [topicId, socket, user]
   );
 
-  const deleteMessage = useCallback(async (messageId: string) => {
+  const deleteForMe = useCallback(async (messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m._id !== messageId));
+    try {
+      await api.deleteMessageForMe(messageId);
+    } catch (error) {
+      console.error("Failed to delete message for me", error);
+    }
+  }, []);
+
+  const deleteForAll = useCallback(async (messageId: string) => {
     setMessages((prev) => prev.filter((m) => m._id !== messageId));
     try {
       await api.deleteMessage(messageId);
     } catch (error) {
-      console.error("Failed to delete message", error);
+      console.error("Failed to delete message for all", error);
     }
   }, []);
 
@@ -244,7 +259,8 @@ export const useTopicChat = (groupId: string | null, topicId: string | null) => 
     loadMore,
     typingUsers,
     emitTyping,
-    deleteMessage,
+    deleteForMe,
+    deleteForAll,
     refreshTopics,
   };
 };

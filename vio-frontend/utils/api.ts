@@ -224,6 +224,11 @@ export const api = {
     return data;
   },
 
+  deleteMessageForMe: async (messageId: string) => {
+    const { data } = await apiClient.put(`/messages/${messageId}/delete-for-me`);
+    return data;
+  },
+
   toggleReaction: async (messageId: string, emoji: string) => {
     const { data } = await apiClient.post(`/messages/${messageId}/reactions`, { emoji });
     return data;

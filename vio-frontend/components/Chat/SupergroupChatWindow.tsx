@@ -24,15 +24,16 @@ export const SupergroupChatWindow: React.FC<SupergroupChatWindowProps> = ({
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
-  const { 
-    messages, 
-    topics, 
-    sendMessage, 
-    emitTyping, 
-    typingUsers, 
-    deleteMessage,
+  const {
+    messages,
+    topics,
+    sendMessage,
+    emitTyping,
+    typingUsers,
+    deleteForMe,
+    deleteForAll,
     refreshTopics,
-    loading: messagesLoading 
+    loading: messagesLoading,
   } = useTopicChat(supergroupId, activeTopicId);
 
   const { user } = useAuth();
@@ -120,7 +121,8 @@ export const SupergroupChatWindow: React.FC<SupergroupChatWindowProps> = ({
               <MessageList
                 messages={messages}
                 currentUserId={currentUserId}
-                onDeleteMessage={deleteMessage}
+                onDeleteForMe={deleteForMe}
+                onDeleteForAll={deleteForAll}
               />
             </div>
 

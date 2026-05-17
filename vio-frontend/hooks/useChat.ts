@@ -184,26 +184,33 @@ export const useChat = (chatId: string | null) => {
     [chatId, socket, user]
   );
 
-  const deleteMessage = useCallback(async (messageId: string) => {
-    // Optimistic UI
+  const deleteForMe = useCallback(async (messageId: string) => {
     setMessages((prev) => prev.filter((m) => m._id !== messageId));
-
     try {
-      await api.deleteMessage(messageId);
+      await api.deleteMessageForMe(messageId);
     } catch (error) {
-      console.error("Failed to delete message", error);
-      // Rollback optimistic delete? (optional)
+      console.error("Failed to delete message for me", error);
     }
   }, []);
 
-  return { 
-    messages, 
-    sendMessage, 
-    loading, 
-    hasMore, 
-    loadMore, 
-    typingUsers, 
-    emitTyping, 
-    deleteMessage 
+  const deleteForAll = useCallback(async (messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m._id !== messageId));
+    try {
+      await api.deleteMessage(messageId);
+    } catch (error) {
+      console.error("Failed to delete message for all", error);
+    }
+  }, []);
+
+  return {
+    messages,
+    sendMessage,
+    loading,
+    hasMore,
+    loadMore,
+    typingUsers,
+    emitTyping,
+    deleteForMe,
+    deleteForAll,
   };
 };

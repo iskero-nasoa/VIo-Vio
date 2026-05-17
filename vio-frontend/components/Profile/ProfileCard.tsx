@@ -35,36 +35,43 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         </button>
       )}
       
-      <div className="flex flex-col items-center text-center space-y-8 relative z-10">
-        <div className="relative">
-          <UserAvatar user={user} size="xl" />
-          <div className="absolute -bottom-3 right-1 bg-primary text-white p-2 rounded-2xl shadow-2xl border-4 border-card">
-            <ShieldCheck size={20} />
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <h2 className="text-4xl font-black tracking-tighter">{user.username}</h2>
-          <div className="flex items-center justify-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${
-              user.status === 'online' ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 
-              user.status === 'away' ? 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-slate-500'
-            }`}></div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
-              {user.statusText || user.status || "Offline"}
-            </p>
-          </div>
-        </div>
+      {/* Two-column grid: stacks to single column on mobile */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
 
-        {user.description && (
-          <p className="text-muted-foreground text-base max-w-md leading-relaxed italic opacity-80">
-            "{user.description}"
-          </p>
-        )}
+        {/* LEFT COLUMN — Avatar + Email + Date */}
+        <div className="flex flex-col gap-6">
+          {/* Avatar / Username / Status */}
+          <div className="flex flex-col items-center text-center gap-4">
+            <div className="relative">
+              <UserAvatar user={user} size="xl" />
+              <div className="absolute -bottom-3 right-1 bg-primary text-white p-2 rounded-2xl shadow-2xl border-4 border-card">
+                <ShieldCheck size={20} />
+              </div>
+            </div>
 
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-6 py-10 border-y border-border/40">
+            <div className="space-y-2">
+              <h2 className="text-4xl font-black tracking-tighter">{user.username}</h2>
+              <div className="flex items-center justify-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${
+                  user.status === 'online' ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' :
+                  user.status === 'away' ? 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-slate-500'
+                }`} />
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
+                  {user.statusText || user.status || "Offline"}
+                </p>
+              </div>
+            </div>
+
+            {user.description && (
+              <p className="text-muted-foreground text-base leading-relaxed italic opacity-80">
+                "{user.description}"
+              </p>
+            )}
+          </div>
+
+          {/* Email card */}
           <div className="flex items-center gap-4 bg-secondary/30 p-4 rounded-2xl border border-transparent hover:border-border transition-all">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
               <Mail size={22} />
             </div>
             <div className="text-left min-w-0">
@@ -72,19 +79,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               <p className="text-sm font-bold truncate">{user.email}</p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4 bg-secondary/30 p-4 rounded-2xl border border-transparent hover:border-border transition-all">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              <Phone size={22} />
-            </div>
-            <div className="text-left min-w-0">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-0.5">Телефон</p>
-              <p className="text-sm font-bold">{user.phone || "Не указан"}</p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-4 bg-secondary/30 p-4 rounded-2xl border border-transparent hover:border-border transition-all sm:col-span-2">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+          {/* Registration date card */}
+          <div className="flex items-center gap-4 bg-secondary/30 p-4 rounded-2xl border border-transparent hover:border-border transition-all">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
               <Calendar size={22} />
             </div>
             <div className="text-left">
@@ -96,25 +94,41 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           </div>
         </div>
 
-        <div className="flex gap-4 w-full pt-4">
-          {isOwnProfile ? (
-            <button
-              onClick={onEdit}
-              className="flex-1 flex items-center justify-center gap-3 py-5 bg-primary text-white rounded-[1.5rem] transition-all font-black text-lg shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] hover:shadow-primary/40"
-            >
-              <Edit3 size={24} />
-              РЕДАКТИРОВАТЬ ПРОФИЛЬ
-            </button>
-          ) : (
-            <button
-              onClick={onSendMessage}
-              className="flex-1 flex items-center justify-center gap-3 py-5 bg-primary text-white rounded-[1.5rem] transition-all font-black text-lg shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] hover:shadow-primary/40"
-            >
-              <MessageSquare size={24} />
-              НАПИСАТЬ СООБЩЕНИЕ
-            </button>
-          )}
+        {/* RIGHT COLUMN — Button (tall) + Phone */}
+        <div className="flex flex-col gap-6">
+          {/* Message / Edit button — fills remaining height */}
+          <div className="flex-1">
+            {isOwnProfile ? (
+              <button
+                onClick={onEdit}
+                className="w-full h-full min-h-[140px] flex items-center justify-center gap-3 py-5 bg-primary text-white rounded-[1.5rem] transition-all font-black text-lg shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] hover:shadow-primary/40"
+              >
+                <Edit3 size={24} />
+                РЕДАКТИРОВАТЬ ПРОФИЛЬ
+              </button>
+            ) : (
+              <button
+                onClick={onSendMessage}
+                className="w-full h-full min-h-[140px] flex items-center justify-center gap-3 py-5 bg-primary text-white rounded-[1.5rem] transition-all font-black text-lg shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] hover:shadow-primary/40"
+              >
+                <MessageSquare size={24} />
+                НАПИСАТЬ СООБЩЕНИЕ
+              </button>
+            )}
+          </div>
+
+          {/* Phone card */}
+          <div className="flex items-center gap-4 bg-secondary/30 p-4 rounded-2xl border border-transparent hover:border-border transition-all">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <Phone size={22} />
+            </div>
+            <div className="text-left min-w-0">
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-0.5">Телефон</p>
+              <p className="text-sm font-bold">{user.phone || "Не указан"}</p>
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
   );

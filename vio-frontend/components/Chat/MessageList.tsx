@@ -9,21 +9,26 @@ import Link from "next/link";
 import { AudioPlayer } from "./AudioPlayer";
 import { ReactionPicker } from "./ReactionPicker";
 import { ReactionBadge } from "./ReactionBadge";
+import { DeleteMessageModal } from "./DeleteMessageModal";
 import { useSocket } from "../../hooks/useSocket";
 
 interface MessageListProps {
   messages: Message[];
   currentUserId: string;
-  onDeleteMessage: (messageId: string) => void;
+  onDeleteForMe: (messageId: string) => void;
+  onDeleteForAll: (messageId: string) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
   currentUserId,
-  onDeleteMessage,
+  onDeleteForMe,
+  onDeleteForAll,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ messageId: string; isOwner: boolean } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const { socket } = useSocket();
 
   useEffect(() => {
@@ -37,6 +42,28 @@ export const MessageList: React.FC<MessageListProps> = ({
     },
     [socket, currentUserId]
   );
+
+  const handleDeleteForMe = useCallback(async () => {
+    if (!deleteModal) return;
+    setDeleteLoading(true);
+    try {
+      await onDeleteForMe(deleteModal.messageId);
+    } finally {
+      setDeleteLoading(false);
+      setDeleteModal(null);
+    }
+  }, [deleteModal, onDeleteForMe]);
+
+  const handleDeleteForAll = useCallback(async () => {
+    if (!deleteModal) return;
+    setDeleteLoading(true);
+    try {
+      await onDeleteForAll(deleteModal.messageId);
+    } finally {
+      setDeleteLoading(false);
+      setDeleteModal(null);
+    }
+  }, [deleteModal, onDeleteForAll]);
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
@@ -84,13 +111,9 @@ export const MessageList: React.FC<MessageListProps> = ({
 
                 {/* Delete Button */}
                 <button
-                  onClick={() => {
-                    if (window.confirm("Удалить сообщение для себя?")) {
-                      onDeleteMessage(msg._id);
-                    }
-                  }}
+                  onClick={() => setDeleteModal({ messageId: msg._id, isOwner: isMe })}
                   className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-                  title="Удалить у себя"
+                  title="Delete message"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -174,6 +197,15 @@ export const MessageList: React.FC<MessageListProps> = ({
         })
       )}
       <div ref={bottomRef} />
+
+      <DeleteMessageModal
+        isOpen={deleteModal !== null}
+        isOwner={deleteModal?.isOwner ?? false}
+        loading={deleteLoading}
+        onClose={() => setDeleteModal(null)}
+        onDeleteForMe={handleDeleteForMe}
+        onDeleteForAll={handleDeleteForAll}
+      />
 
       <style>{`
         @keyframes reactionBadgeIn {

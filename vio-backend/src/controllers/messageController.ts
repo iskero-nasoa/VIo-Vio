@@ -141,25 +141,42 @@ export const deleteMessage = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const isOwner = message.senderId === userId;
-
-    if (isOwner) {
-      await prisma.message.delete({ where: { id: messageId } });
-
-      const io = getIO();
-      if (message.chatId) io.to(message.chatId).emit("message_deleted", messageId);
-      if (message.groupId) io.to(`group_${message.groupId}`).emit("message_deleted", messageId);
-
-      res.status(200).json({ message: "Message deleted for everyone", messageId, type: "hard" });
-    } else {
-      await prisma.deletedMessage.upsert({
-        where: { userId_messageId: { userId, messageId } },
-        create: { userId, messageId },
-        update: { deletedAt: new Date() },
-      });
-
-      res.status(200).json({ message: "Message hidden for you", messageId, type: "soft" });
+    if (message.senderId !== userId) {
+      res.status(403).json({ message: "Only the message author can delete for everyone" });
+      return;
     }
+
+    await prisma.message.delete({ where: { id: messageId } });
+
+    const io = getIO();
+    if (message.chatId) io.to(message.chatId).emit("message_deleted", messageId);
+    if (message.groupId) io.to(`group_${message.groupId}`).emit("message_deleted", messageId);
+    if (message.topicId) io.to(`topic_${message.topicId}`).emit("message_deleted", messageId);
+
+    res.status(200).json({ message: "Message deleted for everyone", messageId, type: "hard" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete message", error });
+  }
+};
+
+export const deleteMessageForMe = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const messageId = req.params.messageId as string;
+    const userId = req.user?.id as string;
+
+    const message = await prisma.message.findUnique({ where: { id: messageId } });
+    if (!message) {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    await prisma.deletedMessage.upsert({
+      where: { userId_messageId: { userId, messageId } },
+      create: { userId, messageId },
+      update: { deletedAt: new Date() },
+    });
+
+    res.status(200).json({ message: "Message hidden for you", messageId, type: "soft" });
   } catch (error) {
     res.status(500).json({ message: "Failed to delete message", error });
   }

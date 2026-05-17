@@ -17,7 +17,7 @@ interface ChatWindowProps {
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, currentUserId, recipient }) => {
-  const { messages, loading, sendMessage, emitTyping, typingUsers, deleteMessage } = useChat(chatId);
+  const { messages, loading, sendMessage, emitTyping, typingUsers, deleteForMe, deleteForAll } = useChat(chatId);
   const { initiateCall } = useCall();
 
   return (
@@ -62,7 +62,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, currentUserId, r
         <MessageList
           messages={messages}
           currentUserId={currentUserId}
-          onDeleteMessage={deleteMessage}
+          onDeleteForMe={deleteForMe}
+          onDeleteForAll={deleteForAll}
         />
       </div>
 

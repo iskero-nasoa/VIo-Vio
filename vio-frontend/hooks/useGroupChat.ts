@@ -214,12 +214,21 @@ export const useGroupChat = (groupId: string | null) => {
     [groupId, socket, user]
   );
 
-  const deleteMessage = useCallback(async (messageId: string) => {
+  const deleteForMe = useCallback(async (messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m._id !== messageId));
+    try {
+      await api.deleteMessageForMe(messageId);
+    } catch (error) {
+      console.error("Failed to delete message for me", error);
+    }
+  }, []);
+
+  const deleteForAll = useCallback(async (messageId: string) => {
     setMessages((prev) => prev.filter((m) => m._id !== messageId));
     try {
       await api.deleteMessage(messageId);
     } catch (error) {
-      console.error("Failed to delete message", error);
+      console.error("Failed to delete message for all", error);
     }
   }, []);
 
@@ -242,7 +251,8 @@ export const useGroupChat = (groupId: string | null) => {
     loadMore,
     typingUsers,
     emitTyping,
-    deleteMessage,
+    deleteForMe,
+    deleteForAll,
     refreshGroup,
   };
 };

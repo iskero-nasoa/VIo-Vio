@@ -24,7 +24,8 @@ export const GroupChatWindow: React.FC<GroupChatWindowProps> = ({ groupId, curre
     sendMessage: sendGroupMessage,
     emitTyping: emitGroupTyping,
     typingUsers: groupTypingUsers,
-    deleteMessage: deleteGroupMessage,
+    deleteForMe: deleteGroupForMe,
+    deleteForAll: deleteGroupForAll,
     refreshGroup,
   } = useGroupChat(groupId);
 
@@ -38,7 +39,8 @@ export const GroupChatWindow: React.FC<GroupChatWindowProps> = ({ groupId, curre
     sendMessage: sendTopicMessage,
     emitTyping: emitTopicTyping,
     typingUsers: topicTypingUsers,
-    deleteMessage: deleteTopicMessage,
+    deleteForMe: deleteTopicForMe,
+    deleteForAll: deleteTopicForAll,
     refreshTopics,
   } = useTopicChat(groupId, activeTopicId);
 
@@ -61,7 +63,8 @@ export const GroupChatWindow: React.FC<GroupChatWindowProps> = ({ groupId, curre
   const sendMessage = isTopicMode ? sendTopicMessage : sendGroupMessage;
   const emitTyping = isTopicMode ? emitTopicTyping : emitGroupTyping;
   const typingUsers = isTopicMode ? topicTypingUsers : groupTypingUsers;
-  const deleteMessage = isTopicMode ? deleteTopicMessage : deleteGroupMessage;
+  const deleteForMe = isTopicMode ? deleteTopicForMe : deleteGroupForMe;
+  const deleteForAll = isTopicMode ? deleteTopicForAll : deleteGroupForAll;
   const loading = groupLoading;
 
   const activeTopic = topics.find((t) => t._id === activeTopicId);
@@ -146,7 +149,8 @@ export const GroupChatWindow: React.FC<GroupChatWindowProps> = ({ groupId, curre
           <MessageList
             messages={messages}
             currentUserId={currentUserId}
-            onDeleteMessage={deleteMessage}
+            onDeleteForMe={deleteForMe}
+            onDeleteForAll={deleteForAll}
           />
         </div>
 
